@@ -1,0 +1,61 @@
+project:
+  name: "CPR v1.0: Scientific Multi-Dimensional Testing"
+  initial_capital: 100000
+  currency: INR
+
+universes:
+  - NIFTY50
+  - NIFTY100
+  - NIFTY500
+
+timeframes:
+  intraday: 5min
+  swing_execution: 1h
+  swing_reference: 1W
+  monthly_execution: 1D
+  monthly_reference: 1M
+
+cpr:
+  atr_length: 20
+  narrow_grid: [0.20, 0.30, 0.40, 0.50, 0.60, 0.75]
+  wide_grid: [0.75, 1.00, 1.25, 1.50, 1.75]
+  neutral_band_allowed: true
+
+execution:
+  signal_to_fill: next_open
+  intraday_exit_time: "15:15"
+  btst_entry: session_close
+  btst_exit: next_open_or_60m
+  options_fill: bid_ask
+
+costs:
+  slippage_per_side: 0.0005
+  brokerage_per_order: 20
+  gst: 0.18
+  sebi_turnover_rate: 0.000001
+  cash_exchange_rate: 0.0000307
+  futures_exchange_rate: 0.0000183
+  options_exchange_rate: 0.0003553
+  cash_intraday_stt_rate: 0.00025
+  futures_stt_rate: 0.0005
+  options_stt_rate: 0.0015
+  cash_stamp_rate: 0.00003
+  futures_stamp_rate: 0.00002
+  options_stamp_rate: 0.00003
+
+wfo:
+  train_periods: 252
+  test_periods: 63
+  step: 63
+  final_holdout_months: 12
+
+monte_carlo:
+  paths: 10000
+  ruin_drawdown_threshold: 0.50
+  seed: 42
+  block_size: 5
+
+sizing:
+  candidate_risk_per_trade: [0.0025, 0.005, 0.01, 0.015, 0.02]
+  candidate_leverage: [1.0, 1.25, 1.5, 2.0, 3.0]
+  max_leverage: 3.0
