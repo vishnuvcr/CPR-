@@ -100,8 +100,8 @@ def main() -> None:
 
     paired_rows = []
     for h, q in fixed_rows:
-        fixed = q.groupby("signal_day", as_index=False).return.mean().rename(columns={"return": "fixed_R"})
-        sel = actual.groupby("signal_day", as_index=False).selected_R.mean()
+        fixed = q.groupby("signal_day", as_index=False)["return_R"].mean().rename(columns={"return_R": "fixed_R"})
+        sel = actual.groupby("signal_day", as_index=False)["selected_R"].mean()
         m = sel.merge(fixed, on="signal_day", how="inner")
         diff = (m.selected_R - m.fixed_R).to_numpy()
         ci_lo, ci_hi = block_bootstrap_mean(diff, rng)
