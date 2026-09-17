@@ -84,11 +84,11 @@ class VirginCPRTracker:
 
 
 def virgin_cpr_candidates(daily: pd.DataFrame) -> pd.DataFrame:
-    """Identify CPRs whose *immediately following session* never touched the zone.
+    """Identify CPRs whose immediately following session never touched the zone.
 
     The source day's own range necessarily contains its CPR. Therefore virgin status
     is determined by the next completed session. A verified zone becomes eligible
-    from the session after that validation session.
+    from the session after that validation session, preventing same-session look-ahead.
     """
     required = {"high", "low", "close"}
     if not required.issubset(daily.columns):
@@ -97,20 +97,21 @@ def virgin_cpr_candidates(daily: pd.DataFrame) -> pd.DataFrame:
 
     x = daily.sort_index()
     rows = []
-    for i in range(len(x) - 1):
+    for i in range(len(x) - 2):
         source_day = x.index[i]
         validation_day = x.index[i + 1]
+        eligible_from = x.index[i + 2]
         source = x.iloc[i]
         validation = x.iloc[i + 1]
         c = cpr_levels(float(source.high), float(source.low), float(source.close))
         untouched_next_day = float(validation.high) < c.lower or float(validation.low) > c.upper
         if untouched_next_day:
-            rows.append({"source_day": source_day, "validation_day": validation_day, "eligible_from": validation_day, "CPR_low": c.lower, "CPR_high": c.upper})
+            rows.append({"source_day": source_day, "validation_day": validation_day, "eligible_from": eligible_from, "CPR_low": c.lower, "CPR_high": c.upper})
     return pd.DataFrame(rows).set_index("source_day") if rows else pd.DataFrame(columns=["validation_day", "eligible_from", "CPR_low", "CPR_high"], index=pd.DatetimeIndex([], name=x.index.name))
 
 
 def vcp_r_first_touch_events(intraday: pd.DataFrame, virgin_zones: pd.DataFrame) -> pd.DataFrame:
-    """Generate the first touch strictly after the validation session."""
+    """Generate the first touch on or after the first eligible session."""
     x = intraday.copy().sort_index()
     d = virgin_zones.copy().sort_index()
     tracker = VirginCPRTracker()
@@ -118,7 +119,7 @@ def vcp_r_first_touch_events(intraday: pd.DataFrame, virgin_zones: pd.DataFrame)
     pending = d.reset_index().sort_values("eligible_from").to_dict("records")
     p = 0
     for ts, row in x.iterrows():
-        while p < len(pending) and pd.Timestamp(pending[p]["eligible_from"]).normalize() < pd.Timestamp(ts).normalize():
+        while p < len(pending) and pd.Timestamp(pending[p]["eligible_from"]).normalize() <= pd.Timestamp(ts).normalize():
             z = pending[p]
             tracker.add_zone(pd.Timestamp(z["source_day"]), float(z["CPR_low"]), float(z["CPR_high"]))
             p += 1
