@@ -1,0 +1,71 @@
+name: CPR reference-data baseline
+
+on:
+  push:
+    branches:
+      - cpr-v1.0-scientific-multi-dimensional-testing
+    paths:
+      - '.github/workflows/real-data-baseline.yml'
+      - 'scripts/prepare_reference_nifty.py'
+      - 'scripts/run_baseline.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Download pinned reference dataset
+        run: |
+          curl --fail --location --retry 3 \
+            'https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv' \
+            --output reference_nifty_1m.csv
+      - name: Convert to canonical 5-minute OHLCV
+        run: |
+          python scripts/prepare_reference_nifty.py \
+            --input reference_nifty_1m.csv \
+            --output data/reference/NIFTY50_5min_reference.csv
+      - name: Validate canonical data
+        run: |
+          python - <<'PY'
+          from cpr_lab.data_quality import load_ohlcv_csv
+          p = 'data/reference/NIFTY50_5min_reference.csv'
+          df = load_ohlcv_csv(p)
+          assert len(df) > 10000
+          assert str(df.index.tz) == 'Asia/Kolkata'
+          print('validated_rows=', len(df))
+          print('start=', df.index.min())
+          print('end=', df.index.max())
+          PY
+      - name: Run fixed pre-optimization baseline
+        run: |
+          python scripts/run_baseline.py \
+            --input data/reference/NIFTY50_5min_reference.csv \
+            --output-dir results/reference_baseline \
+            --initial-capital 100000 \
+            --risk-per-trade 0.01 \
+            --max-leverage 2.0
+      - name: Validate baseline artifacts
+        run: |
+          test -s results/reference_baseline/trades.csv
+          test -s results/reference_baseline/equity.csv
+          test -s results/reference_baseline/metrics.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpr-reference-baseline
+          path: |
+            data/reference/NIFTY50_5min_reference.csv
+            data/reference/NIFTY50_5min_reference.provenance.txt
+            results/reference_baseline/signals.csv
+            results/reference_baseline/trades.csv
+            results/reference_baseline/equity.csv
+            results/reference_baseline/metrics.csv
