@@ -7,6 +7,7 @@ of trading performance.
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import numpy as np
 import pandas as pd
 
@@ -36,8 +37,10 @@ def main() -> None:
     volume = rng.integers(100_000, 500_000, n)
 
     out = pd.DataFrame({"timestamp": idx, "open": open_, "high": high, "low": low, "close": close, "volume": volume})
-    out.to_csv(args.output, index=False)
-    print(f"Wrote {len(out):,} bars to {args.output}")
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(output, index=False)
+    print(f"Wrote {len(out):,} bars to {output}")
 
 
 if __name__ == "__main__":
