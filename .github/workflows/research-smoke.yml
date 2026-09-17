@@ -30,13 +30,17 @@ jobs:
       - name: Validate WFO artifact
         run: |
           test -s wfo_smoke.csv
+          test -s wfo_smoke_stitched.csv
           python - <<'PY'
           import pandas as pd
-          x = pd.read_csv('wfo_smoke.csv')
-          assert len(x) > 0, 'WFO produced no rows'
+          folds = pd.read_csv('wfo_smoke.csv')
+          stitched = pd.read_csv('wfo_smoke_stitched.csv')
+          assert len(folds) > 0, 'WFO produced no folds'
+          assert len(stitched) > 0, 'WFO produced no stitched test rows'
           required = {'param_narrow_x','param_wide_y','param_atr_stop','param_target_r'}
-          assert required.issubset(x.columns), f'missing columns: {required-set(x.columns)}'
-          print('WFO smoke rows:', len(x))
+          assert required.issubset(stitched.columns), f'missing columns: {required-set(stitched.columns)}'
+          print('WFO folds:', len(folds))
+          print('WFO stitched test rows:', len(stitched))
           PY
       - name: Generate deterministic MC trades
         run: |
@@ -63,4 +67,5 @@ jobs:
           name: cpr-v1-smoke-results
           path: |
             wfo_smoke.csv
+            wfo_smoke_stitched.csv
             monte_carlo.txt
