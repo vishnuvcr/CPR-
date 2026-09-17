@@ -19,8 +19,9 @@ on:
           - monte_carlo
           - wfo_smoke
           - wfo
+          - full_smoke
       data_path:
-        description: "OHLCV CSV path for WFO (timestamp, open, high, low, close, volume)"
+        description: "OHLCV CSV path for real WFO (timestamp, open, high, low, close, volume)"
         required: false
         default: "data/ohlcv.csv"
         type: string
@@ -40,7 +41,7 @@ permissions:
 
 jobs:
   unit-tests:
-    if: github.event_name != 'workflow_dispatch' || inputs.run_mode == 'unit'
+    if: github.event_name != 'workflow_dispatch' || inputs.run_mode == 'unit' || inputs.run_mode == 'full_smoke'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +54,7 @@ jobs:
       - run: python -m pytest
 
   monte-carlo:
-    if: github.event_name == 'workflow_dispatch' && inputs.run_mode == 'monte_carlo'
+    if: github.event_name == 'workflow_dispatch' && (inputs.run_mode == 'monte_carlo' || inputs.run_mode == 'full_smoke')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +89,7 @@ jobs:
           path: results_monte_carlo.txt
 
   wfo-smoke:
-    if: github.event_name == 'workflow_dispatch' && inputs.run_mode == 'wfo_smoke'
+    if: github.event_name == 'workflow_dispatch' && (inputs.run_mode == 'wfo_smoke' || inputs.run_mode == 'full_smoke')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -99,11 +100,11 @@ jobs:
       - name: Generate deterministic synthetic 5-minute OHLCV
         run: python scripts/generate_synthetic_ohlcv.py --days 520 --output data/wfo_smoke.csv
       - name: Run WFO smoke test
-        run: python scripts/run_wfo.py --input data/wfo_smoke.csv --format csv --output wfo_smoke.csv
+        run: python scripts/run_wfo.py --input data/wfo_smoke.csv --format csv --fast --output wfo_smoke.csv
       - uses: actions/upload-artifact@v4
         with:
           name: cpr-wfo-smoke-results
-          path: wfo_smoke.csv
+          path: wfo_smoke*
 
   wfo:
     if: github.event_name == 'workflow_dispatch' && inputs.run_mode == 'wfo'
@@ -122,4 +123,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: cpr-wfo-results
-          path: wfo_results.csv
+          path: wfo_results*
