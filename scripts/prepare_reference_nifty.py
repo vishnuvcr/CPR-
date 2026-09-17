@@ -34,15 +34,16 @@ def prepare(input_path: Path, output_path: Path) -> None:
     if ts.duplicated().any():
         raise ValueError(f"Duplicate source timestamps: {int(ts.duplicated().sum())}")
 
-    x = pd.DataFrame(
-        {
-            "open": pd.to_numeric(raw["Open"], errors="coerce"),
-            "high": pd.to_numeric(raw["High"], errors="coerce"),
-            "low": pd.to_numeric(raw["Low"], errors="coerce"),
-            "close": pd.to_numeric(raw["Close"], errors="coerce"),
-        },
-        index=ts,
-    ).sort_index()
+    # Convert to NumPy arrays before constructing the datetime-indexed frame.
+    # Otherwise pandas aligns the original RangeIndex to the new DatetimeIndex,
+    # silently turning every OHLC value into NaN.
+    ohlc = {
+        "open": pd.to_numeric(raw["Open"], errors="raise").to_numpy(),
+        "high": pd.to_numeric(raw["High"], errors="raise").to_numpy(),
+        "low": pd.to_numeric(raw["Low"], errors="raise").to_numpy(),
+        "close": pd.to_numeric(raw["Close"], errors="raise").to_numpy(),
+    }
+    x = pd.DataFrame(ohlc, index=ts).sort_index()
 
     source_missing_ohlc_rows = int(x.isna().any(axis=1).sum())
     if source_missing_ohlc_rows:
@@ -80,7 +81,6 @@ def prepare(input_path: Path, output_path: Path) -> None:
     keep = (source_counts == 5) & (valid_counts == 5)
     bars = bars_all.loc[keep]
     counts = source_counts.loc[bars.index]
-    valid = valid_counts.loc[bars.index]
 
     if bars.empty:
         raise ValueError(
