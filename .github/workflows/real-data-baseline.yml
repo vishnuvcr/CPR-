@@ -9,6 +9,8 @@ on:
       - 'scripts/prepare_reference_nifty.py'
       - 'scripts/run_baseline.py'
       - 'cpr_lab/data_quality.py'
+      - 'cpr_lab/engine.py'
+      - 'cpr_lab/costs.py'
   workflow_dispatch:
 
 permissions:
