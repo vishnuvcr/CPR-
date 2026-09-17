@@ -45,7 +45,6 @@ def simulate_single_position(
     liquidated = False
 
     for i, (ts, row) in enumerate(x.iterrows()):
-        # Mark existing position to market at current close before handling new signal.
         mtm = equity
         if position is not None:
             direction = 1 if position == "LONG" else -1
@@ -56,7 +55,6 @@ def simulate_single_position(
             direction = 1 if position == "LONG" else -1
             exit_reason = None
             exit_price = None
-            # Gap first.
             if direction == 1 and float(row.open) <= stop:
                 exit_price, exit_reason = float(row.open), "gap_stop"
             elif direction == -1 and float(row.open) >= stop:
@@ -83,6 +81,8 @@ def simulate_single_position(
                 if equity <= 0:
                     equity = 0.0
                     liquidated = True
+                # Replace the pre-exit mark-to-market value with realized account equity.
+                equity_curve[-1] = (ts, equity)
 
                 trades.append({
                     "entry_time": entry_ts,
@@ -121,8 +121,6 @@ def simulate_single_position(
                 target_price = fill + target_r * risk_distance if direction == 1 else fill - target_r * risk_distance
                 capital_at_risk = equity * config.risk_per_trade
                 q = capital_at_risk / risk_distance
-                # Enforce leverage on absolute notional and never allow negative
-                # equity/position sizes to enter the sizing calculation.
                 max_qty = (equity * config.max_leverage) / max(abs(fill), 1e-12)
                 q = min(q, max_qty)
                 if q <= 0:
@@ -130,7 +128,6 @@ def simulate_single_position(
                 position = side
                 entry_price, stop, target, entry_ts, qty = fill, stop_price, target_price, next_ts, q
 
-    # Close any open position at last close, unless the account already liquidated.
     if position is not None and not liquidated:
         ts = x.index[-1]
         price_raw = float(x.iloc[-1].close)
@@ -145,6 +142,7 @@ def simulate_single_position(
         if equity <= 0:
             equity = 0.0
             liquidated = True
+        equity_curve[-1] = (ts, equity)
         trades.append({
             "entry_time": entry_ts, "exit_time": ts, "side": position,
             "entry_price": entry_price, "exit_price": fill, "qty": qty,
@@ -153,7 +151,6 @@ def simulate_single_position(
             "exit_reason": "end_of_test",
             "account_liquidated": liquidated,
         })
-        equity_curve.append((ts, equity))
 
     trade_df = pd.DataFrame(trades)
     eq = pd.DataFrame(equity_curve, columns=["timestamp", "equity"]).drop_duplicates("timestamp").set_index("timestamp")
