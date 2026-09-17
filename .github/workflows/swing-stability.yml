@@ -8,6 +8,7 @@ on:
       - 'scripts/run_swing_characterization.py'
       - 'scripts/prepare_reference_nifty.py'
       - 'cpr_lab/**'
+      - 'docs/CPR_RESEARCH_PLAN.md'
       - '.github/workflows/swing-stability.yml'
   workflow_dispatch:
 
