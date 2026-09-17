@@ -67,6 +67,36 @@ def main() -> None:
     config = StrategyConfig(narrow_x=NARROW_X, wide_y=WIDE_Y, atr_stop=1.0, target_r=2.0, exit_time="15:15")
     signals = intraday_directional_signals(x, config)
 
+    # Coverage diagnostic: determine whether the pre-specified narrow/neutral/wide
+    # thresholds actually partition the reference data. This is descriptive only.
+    daily_width = daily_features["D_CPR_width_ATR_ratio"].dropna()
+    daily_regime = pd.Series("neutral", index=daily_width.index, dtype="object")
+    daily_regime.loc[daily_width < NARROW_X] = "narrow"
+    daily_regime.loc[daily_width > WIDE_Y] = "wide"
+    coverage = pd.DataFrame({"width_ratio": daily_width, "regime": daily_regime})
+    coverage_summary = (
+        coverage.groupby("regime")["width_ratio"]
+        .agg(["count", "mean", "median", "min", "max"])
+        .reset_index()
+    )
+    coverage_summary.to_csv(out / "daily_width_coverage.csv", index=False)
+    pd.DataFrame({
+        "metric": ["count", "mean", "median", "p01", "p05", "p25", "p50", "p75", "p95", "p99", "max"],
+        "value": [
+            daily_width.size,
+            daily_width.mean(),
+            daily_width.median(),
+            daily_width.quantile(.01),
+            daily_width.quantile(.05),
+            daily_width.quantile(.25),
+            daily_width.quantile(.50),
+            daily_width.quantile(.75),
+            daily_width.quantile(.95),
+            daily_width.quantile(.99),
+            daily_width.max(),
+        ],
+    }).to_csv(out / "daily_width_distribution.csv", index=False)
+
     rows = []
     for i, (ts, r) in enumerate(x.iloc[:-1].iterrows()):
         side = "LONG" if bool(signals.loc[ts, "long_entry"]) else "SHORT" if bool(signals.loc[ts, "short_entry"]) else None
@@ -113,6 +143,8 @@ def main() -> None:
     if events.empty:
         raise SystemExit("No CPR signals generated")
 
+    # Quantile bins are exploratory descriptors, not optimized trading thresholds.
+    events["width_decile"] = pd.qcut(events["width_ratio"], q=10, labels=False, duplicates="drop") + 1
     events.to_csv(out / "signal_events.csv", index=False)
     signals.to_csv(out / "signals.csv")
 
@@ -133,14 +165,28 @@ def main() -> None:
             if len(z):
                 conditional.append(summarize(z, f"{column}={level}"))
 
+    width_deciles = [summarize(z, f"width_decile={int(level)}") | {"width_ratio_median": z.width_ratio.median()} for level, z in events.groupby("width_decile", observed=True)]
+    pd.DataFrame(width_deciles).to_csv(out / "width_decile_metrics.csv", index=False)
+
+    try:
+        from scipy.stats import spearmanr  # type: ignore
+        rho, p_width = spearmanr(events["width_ratio"], events["close_pnl_r"])
+        pd.DataFrame([{"spearman_rho_width_vs_close_R": rho, "p_value": p_width, "signals": len(events)}]).to_csv(out / "width_correlation.csv", index=False)
+    except ImportError:
+        pass
+
     yearly = [summarize(z, f"year={year}") for year, z in events.groupby("year")]
     pd.DataFrame(conditional).to_csv(out / "conditional_metrics.csv", index=False)
     pd.DataFrame(yearly).to_csv(out / "yearly_metrics.csv", index=False)
 
     print("=== ALL / DIRECTION ===")
     print(pd.DataFrame(base_metrics).to_string(index=False))
-    print("\n=== CPR REGIME / SIGNAL TYPE / ENTRY TIME ===")
+    print("\n=== FIXED CPR REGIME / SIGNAL TYPE / ENTRY TIME ===")
     print(pd.DataFrame(conditional).to_string(index=False))
+    print("\n=== WIDTH DECILES (EXPLORATORY, NOT OPTIMIZED) ===")
+    print(pd.DataFrame(width_deciles).to_string(index=False))
+    print("\n=== DAILY CPR WIDTH COVERAGE ===")
+    print(coverage_summary.to_string(index=False))
     print("\n=== YEARLY STABILITY ===")
     print(pd.DataFrame(yearly).to_string(index=False))
 
