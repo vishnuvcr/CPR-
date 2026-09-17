@@ -26,7 +26,7 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 1D | Intraday event/trade lifecycle with stops, targets and time exits, excluding costs | DEFERRED | Revisit only if later evidence provides a justified intraday hypothesis |
 | 2A | BTST signal characterization | COMPLETE — LOW SAMPLE / NO STABLE SEPARATION | Bias-safe end-of-session signal characterized; only 31 valid events, with no stable aggregate or year-wise separation |
 | 2B | BTST executable lifecycle and realistic costs | DEFERRED | Revisit only if a later, independently justified BTST hypothesis provides sufficient signal density |
-| 3A | Swing horizons (2/3/5/10 sessions) | IN PROGRESS | Horizon-dependent CPR effect characterized without threshold optimization |
+| 3A | Swing horizons (2/3/5/10 sessions) | COMPLETE — STABILITY ANALYSIS IN PROGRESS | Horizons characterized; apparent directional asymmetry must survive dependence-aware and chronological stability checks |
 | 3B | Swing executable lifecycle and costs | PLANNED | Out-of-sample cost-aware results |
 | 4 | Cross-horizon conditional selector | PLANNED | Predefined features select horizon without leakage |
 | 5 | ML model as regime/horizon selector | PLANNED | Walk-forward validation beats appropriate baselines after costs |
@@ -34,17 +34,19 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 7 | Final walk-forward / untouched holdout | PLANNED | No material degradation on unseen data |
 | 8 | Paper-trading signal pipeline | PLANNED | Reproducible live signal generation with explicit execution rules |
 
-## Current step: Phase 3A — Swing horizon characterization
+## Current step: Phase 3A — Swing directional stability
 
-Phase 2A used a deliberately strict executable BTST definition: only the final completed bar of each source session could generate the signal, with the next session open as the entry. The corrected CI run completed successfully with temporal-integrity validation. It produced 31 valid end-of-session signals across 2015–2023. Aggregate overnight mean outcome was -0.044 R (p=0.313) and next-session mean outcome was -0.077 R (p=0.369). LONG/SHORT and yearly results were mixed rather than showing stable separation; several yearly groups contain only 1–7 observations. Because the sample is sparse, this is not evidence that BTST can never work, but it does not justify an executable BTST branch at this stage.
+Phase 3A characterization completed successfully on the pinned reference dataset. The unchanged bias-safe CPR directional signal was evaluated at a completed source bar and executed at the following bar open. Outcomes were measured to the close of the pre-specified 2, 3, 5 and 10 trading-session horizons. Aggregate results were approximately -0.011 R, +0.009 R, -0.001 R and -0.056 R respectively; none showed a statistically reliable aggregate mean effect.
 
-Phase 3A therefore tests whether the unchanged bias-safe CPR directional signal has information at pre-specified swing horizons of 2, 3, 5 and 10 trading sessions. The signal is evaluated at a completed source bar and executed at the following bar open, exactly as in Phase 1C. Outcomes will be measured from that executable entry to the close of each specified future session, with MFE/MAE and direction/year/regime/time descriptions. No horizon, width threshold, stop, target, or subgroup will be selected from observed profitability.
+The directional decomposition showed increasing separation at longer horizons: LONG mean outcomes were approximately +0.103 R at 5 sessions and +0.315 R at 10 sessions, while SHORT outcomes were approximately -0.121 R and -0.482 R respectively. These observations are hypothesis-generating only because the event series contains many overlapping signals and the eight LONG/SHORT-by-horizon tests were examined together. They must not be promoted to a trading rule without dependence-aware and chronological stability testing.
+
+The current Phase 3A stability analysis therefore uses three pre-specified views: equal-weight signal-day clusters, fixed 10-session time blocks, and chronological 2015–2019 versus 2020–2024 subperiods. It also reports year-wise sign consistency and Holm-adjusted p-values across the eight directional horizon tests. No threshold, horizon, entry time, or subgroup is optimized from observed profitability.
 
 ## Decision gates
 
 - If BTST characterization shows no meaningful and stable separation: proceed to swing characterization.
 - If a BTST effect appears: test its stability across years/subperiods before designing an executable BTST strategy.
-- Any promising subgroup must survive chronological out-of-sample testing and realistic costs.
+- Any promising swing directional pattern must survive dependence-aware stability, chronological out-of-sample testing, and realistic costs.
 - A positive backtest alone is not sufficient for promotion; reproducibility and robustness are required.
 
 ## Change log
@@ -62,3 +64,4 @@ Phase 3A therefore tests whether the unchanged bias-safe CPR directional signal 
 - 2026-09-18: BTST workflow initially failed during canonicalization because an unsupported --source-counts-output argument was passed; the workflow was corrected.
 - 2026-09-18: BTST characterization was audited for temporal leakage. The original implementation used the full source-session close for intraday signals generated before that close. BTST logic was corrected to use only the final completed source-session bar and the next-session open as the executable entry. CI now explicitly validates one end-of-session event per source day and final-bar timing.
 - 2026-09-18: Phase 2A rerun completed successfully after fixing the summary outcome-column collision. Artifact validation and timing-integrity checks passed. The corrected characterization produced 31 valid end-of-session events; aggregate overnight and next-session outcomes did not show stable separation, and yearly sample sizes were too small for a stability claim. Phase 2B is therefore deferred and Phase 3A swing-horizon characterization is advanced.
+- 2026-09-18: Phase 3A swing characterization completed successfully. Aggregate 2/3/5/10-session outcomes did not show a statistically reliable overall effect, while LONG/SHORT results became increasingly separated at 5–10 sessions. Because the raw event series contains overlapping observations, a dependence-aware stability analysis was added before any executable swing strategy is considered.
