@@ -58,9 +58,7 @@ def main() -> None:
     signals = intraday_directional_signals(x, StrategyConfig(narrow_x=NARROW_X, wide_y=WIDE_Y, atr_stop=1.0, target_r=2.0, exit_time="15:15"))
 
     rows: list[dict[str, object]] = []
-    for i in range(len(x)):
-        if i + max(HORIZONS) >= len(x):
-            break
+    for i in range(len(x) - 1):
         ts = x.index[i]
         side = "LONG" if bool(signals.loc[ts, "long_entry"]) else "SHORT" if bool(signals.loc[ts, "short_entry"]) else None
         atr = x.iloc[i].get("D_ATR20")
@@ -68,17 +66,26 @@ def main() -> None:
         if side is None or pd.isna(atr) or float(atr) <= 0 or pd.isna(width):
             continue
         entry_i = i + 1
-        entry = float(x.iloc[entry_i].open)
+        entry_ts = x.index[entry_i]
+        # A horizon is only valid if its exit remains inside the same trading session.
+        # This prevents an intraday horizon from silently becoming an overnight/BTST test.
+        same_session = x.index.date == entry_ts.date()
+        entry_positions = np.flatnonzero(x.index == entry_ts)
+        if len(entry_positions) == 0:
+            continue
+        entry_pos = int(entry_positions[0])
         direction = 1 if side == "LONG" else -1
         regime = "narrow" if float(width) < NARROW_X else "wide" if float(width) > WIDE_Y else "neutral"
         bucket = "09:15-10:00" if ts.hour*60+ts.minute <= 600 else "10:01-12:00" if ts.hour*60+ts.minute <= 720 else "12:01-14:00" if ts.hour*60+ts.minute <= 840 else "14:01+"
-        base = {"signal_time":ts, "entry_time":x.index[entry_i], "date":ts.date(), "year":ts.year, "side":side, "regime":regime, "entry_bucket":bucket, "width_ratio":float(width), "entry_price":entry, "ATR":float(atr)}
+        base = {"signal_time":ts, "entry_time":entry_ts, "date":ts.date(), "year":ts.year, "side":side, "regime":regime, "entry_bucket":bucket, "width_ratio":float(width), "entry_price":float(x.iloc[entry_i].open), "ATR":float(atr)}
+        entry = float(x.iloc[entry_i].open)
+
         for h in HORIZONS:
-            j = entry_i + h - 1
-            if j >= len(x):
+            j = entry_pos + h - 1
+            if j >= len(x) or not same_session[j]:
                 continue
             close = float(x.iloc[j].close)
-            future = x.iloc[entry_i:j+1]
+            future = x.iloc[entry_pos:j+1]
             pnl = direction * (close-entry)
             mfe = direction * ((future.high.max() if direction == 1 else future.low.min()) - entry)
             mae = direction * ((future.low.min() if direction == 1 else future.high.max()) - entry)
@@ -88,7 +95,7 @@ def main() -> None:
 
         # EOD is measured from next-bar open through the final bar of the same session.
         day_rows = x.loc[x.index.date == ts.date()]
-        day_rows = day_rows.loc[day_rows.index >= x.index[entry_i]]
+        day_rows = day_rows.loc[day_rows.index >= entry_ts]
         if not day_rows.empty:
             close = float(day_rows.iloc[-1].close)
             pnl = direction * (close-entry)
@@ -115,17 +122,19 @@ def main() -> None:
         for bucket in ("09:15-10:00","10:01-12:00","12:01-14:00","14:01+"):
             q = z[z.entry_bucket == bucket]
             if len(q): summaries.append(summarize(q, f"entry={bucket}", h))
-    pd.DataFrame(summaries).to_csv(out / "multihorizon_metrics.csv", index=False)
+    metrics = pd.DataFrame(summaries)
+    metrics.to_csv(out / "multihorizon_metrics.csv", index=False)
 
     yearly = []
     for (year,h), z in events.groupby(["year","horizon"], sort=True):
         yearly.append(summarize(z, f"year={year}", h))
-    pd.DataFrame(yearly).to_csv(out / "multihorizon_yearly_metrics.csv", index=False)
+    yearly_df = pd.DataFrame(yearly)
+    yearly_df.to_csv(out / "multihorizon_yearly_metrics.csv", index=False)
 
     print("=== MULTI-HORIZON ALL / DIRECTION ===")
-    print(pd.DataFrame(summaries)[pd.DataFrame(summaries).group.isin(["ALL","LONG","SHORT"])].to_string(index=False))
+    print(metrics[metrics.group.isin(["ALL","LONG","SHORT"])].to_string(index=False))
     print("\n=== YEARLY MULTI-HORIZON ===")
-    print(pd.DataFrame(yearly).to_string(index=False))
+    print(yearly_df.to_string(index=False))
 
 
 if __name__ == "__main__":
