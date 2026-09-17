@@ -28,21 +28,20 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 2B | BTST executable lifecycle and realistic costs | DEFERRED | Revisit only if a later, independently justified BTST hypothesis provides sufficient signal density |
 | 3A | Swing horizons (2/3/5/10 sessions) | COMPLETE — DIRECTIONAL STABILITY REVIEWED | Horizon-dependent effects characterized and dependence-aware/chronological stability assessed |
 | 3B | Swing executable lifecycle and costs | DEFERRED pending selector evidence | A defined swing hypothesis must first survive selector/OOS testing |
-| 4 | Cross-horizon conditional selector | IN PROGRESS | Predefined walk-forward selector evaluated against fixed-horizon baselines without leakage |
-| 5 | ML model as regime/horizon selector | PLANNED | Walk-forward validation beats appropriate non-ML baselines after costs |
+| 4 | Cross-horizon conditional selector | COMPLETE — NO STATISTICALLY RELIABLE SELECTOR ADVANTAGE ESTABLISHED | Corrected identical-signal OOS comparison completed; selector point estimate positive but paired comparisons not significant after multiple-testing context |
+| 4B | Selector null/stability stress test | IN PROGRESS | Random-horizon null, paired block bootstrap, selection concentration, and reproducibility checks completed before any ML stage |
+| 5 | ML model as regime/horizon selector | PLANNED — GATED BY 4B | Only proceed if selector survives null/stress testing and has a clearly defined incremental hypothesis |
 | 6 | Robustness: subperiods, volatility regimes, direction, perturbation, Monte Carlo | PLANNED | Edge survives reasonable robustness tests |
 | 7 | Final walk-forward / untouched holdout | PLANNED | No material degradation on unseen data |
 | 8 | Paper-trading signal pipeline | PLANNED | Reproducible live signal generation with explicit execution rules |
 
-## Current step: Phase 4 — Cross-horizon conditional selector
+## Current step: Phase 4B — Selector null/stability stress test
 
-Phase 3A stability analysis completed successfully on the pinned reference dataset. Equal-weight signal-day clustering and fixed 10-session blocks showed that the longer-horizon directional separation is not explained solely by treating every intraday event as independent. However, the chronological 2015–2019 versus 2020–2024 comparison showed material regime dependence: the LONG effect changes substantially over time, while the SHORT effect is also horizon- and period-dependent. The aggregate directional pattern is therefore hypothesis-generating rather than a stationary executable edge.
+Phase 4 was completed with the corrected identical-signal benchmark. The leakage-safe walk-forward selector produced a positive point estimate, but the selector-versus-fixed-horizon paired comparisons did not establish a statistically reliable incremental advantage. The corrected design uses the exact same OOS signal identities for SELECTED and each fixed-horizon benchmark, with a chronological training/validation split and a 10-session purge. This prevents the earlier benchmark-population mismatch from being mistaken for selector value.
 
-The stability work used eight pre-specified LONG/SHORT-by-horizon tests with Holm correction, fixed 10-session blocks, equal-weight signal-day clusters, two chronological subperiods, and year-wise sign consistency. The primary equal-weight signal-day analysis produced Holm-adjusted significance for 3-session LONG, 5-session LONG, 10-session LONG and 10-session SHORT. The fixed-block analysis also showed strong negative 10-session SHORT behavior. These findings are not sufficient for promotion because the chronological subperiod results do not reproduce a uniform effect across time.
+Phase 4B therefore stress-tests whether the observed selector improvement is distinguishable from a null process. The primary null assigns one of the four predeclared horizons randomly within each walk-forward split/direction/entry-time cell while preserving the same OOS signal identities. Additional dependence-aware paired block bootstrap intervals and selection-concentration diagnostics quantify uncertainty and whether the selector is effectively behaving like a fixed rule.
 
-Phase 4 therefore tests whether a pre-specified walk-forward horizon selector can adapt to changing conditions without using future outcomes. The first selector is intentionally simple and non-ML: fixed-horizon baselines (always 2/3/5/10 sessions) are compared with a rolling historical selector using only information available before each validation block. Candidate conditioning variables are fixed in advance as signal direction and entry-time bucket. No width threshold or other feature will be tuned from validation profitability. Selection occurs only inside chronological training windows, followed by untouched forward validation blocks.
-
-No Phase 3B executable strategy is promoted until Phase 4 demonstrates that a selector can improve on fixed-horizon baselines out of sample and the resulting hypothesis survives realistic transaction-cost analysis.
+No ML selector will be introduced during 4B. No threshold, horizon, or feature will be optimized from the OOS results. The Phase 4B outputs will determine whether the selector hypothesis remains sufficiently supported to justify a later ML hypothesis.
 
 ## Decision gates
 
@@ -50,6 +49,7 @@ No Phase 3B executable strategy is promoted until Phase 4 demonstrates that a se
 - If a BTST effect appears: test its stability across years/subperiods before designing an executable BTST strategy.
 - Any promising swing directional pattern must survive dependence-aware stability, chronological out-of-sample testing, and realistic costs.
 - A positive backtest alone is not sufficient for promotion; reproducibility and robustness are required.
+- A positive selector point estimate is not sufficient for Phase 5; selector value must survive null/stress testing.
 
 ## Change log
 
@@ -68,3 +68,5 @@ No Phase 3B executable strategy is promoted until Phase 4 demonstrates that a se
 - 2026-09-18: Phase 2A rerun completed successfully after fixing the summary outcome-column collision. Artifact validation and timing-integrity checks passed. The corrected characterization produced 31 valid end-of-session events; aggregate overnight and next-session outcomes did not show stable separation, and yearly sample sizes were too small for a stability claim. Phase 2B is therefore deferred and Phase 3A swing-horizon characterization is advanced.
 - 2026-09-18: Phase 3A swing characterization completed successfully. Aggregate 2/3/5/10-session outcomes did not show a statistically reliable overall effect, while LONG/SHORT results became increasingly separated at 5–10 sessions. Because the raw event series contains overlapping observations, a dependence-aware stability analysis was added before any executable swing strategy is considered.
 - 2026-09-18: Phase 3A directional stability completed successfully. Holm-adjusted signal-day clustering and fixed 10-session block analyses supported longer-horizon directional separation, but 2015–2019 versus 2020–2024 results demonstrated material regime dependence. Phase 3B is therefore deferred and Phase 4 cross-horizon conditional selection is advanced.
+- 2026-09-18: Phase 4 corrected identical-signal OOS benchmark completed successfully. SELECTED had a positive point estimate relative to fixed horizons, but paired OOS differences were not statistically significant; Phase 5 ML is gated pending a null/stability stress test.
+- 2026-09-18: Phase 4B selector stress-test implementation added. It preserves exact Phase 4 OOS signal identities, uses a reproducible random-horizon null, dependence-aware paired block bootstrap intervals, and selection-concentration diagnostics. CI validation is now running on the pinned reference dataset.
