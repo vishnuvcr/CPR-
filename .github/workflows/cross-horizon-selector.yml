@@ -35,7 +35,7 @@ jobs:
         run: python scripts/run_swing_characterization.py --input data/canonical/nifty50_5m.csv --output-dir artifacts/swing
       - name: Run Phase 4 selector
         run: python scripts/run_cross_horizon_selector.py --input artifacts/swing/swing_events.csv --output-dir artifacts/cross-horizon
-      - name: Validate Phase 4 outputs
+      - name: Validate Phase 4 outputs and leakage guards
         run: |
           test -s artifacts/cross-horizon/cross_horizon_selections.csv
           test -s artifacts/cross-horizon/cross_horizon_selected_events.csv
@@ -43,14 +43,19 @@ jobs:
           test -s artifacts/cross-horizon/cross_horizon_oos_yearly.csv
           python - <<'PY'
           import pandas as pd
-          s=pd.read_csv('artifacts/cross-horizon/cross_horizon_selections.csv')
-          o=pd.read_csv('artifacts/cross-horizon/cross_horizon_selected_events.csv')
+          s=pd.read_csv('artifacts/cross-horizon/cross_horizon_selections.csv', parse_dates=['train_end','purge_start','validation_start','validation_end'])
+          o=pd.read_csv('artifacts/cross-horizon/cross_horizon_selected_events.csv', parse_dates=['entry_session','target_session'])
           c=pd.read_csv('artifacts/cross-horizon/cross_horizon_oos_comparison.csv')
-          assert len(s)>=2 and set(s.side)=={'LONG','SHORT'}
+          assert len(s)>=8 and set(s.side)=={'LONG','SHORT'}
+          assert set(s.entry_bucket).issubset({'09:15-10:00','10:01-12:00','12:01-14:00','14:01+'})
           assert set(s.selected_horizon).issubset({'2session','3session','5session','10session'})
           assert len(o)>0
           assert set(c.strategy)=={'SELECTED','2session','3session','5session','10session'}
-          assert s.train_end.max() < s.validation_start.min()
+          assert (s.train_end < s.validation_start).all()
+          assert (s.validation_end < s.validation_start.shift(-1)).dropna().all()
+          assert (s.purge_start > s.train_end).all()
+          assert (s.purge_start < s.validation_start).all()
+          assert (o.entry_session <= o.target_session).all()
           print('Phase 4 validation: PASS')
           print(c.to_string(index=False))
           print(pd.read_csv('artifacts/cross-horizon/cross_horizon_oos_yearly.csv').to_string(index=False))
