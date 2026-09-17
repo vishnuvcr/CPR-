@@ -21,8 +21,8 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 |---|---|---|---|
 | 0 | Data integrity, provenance, reproducibility | COMPLETE | Canonical data validates; reproducibility smoke passes |
 | 1A | Unconditional intraday CPR signal edge | COMPLETE | 4,281 signals characterized; unconditional next-bar edge assessed |
-| 1B | Conditional intraday edge by CPR regime, signal type, direction, time, year | IN PROGRESS — WIDTH DIAGNOSTIC REQUIRED | Fixed CPR regimes must actually partition the data; exploratory width analysis reviewed |
-| 1C | Intraday multi-horizon outcomes (1/3/6/12 bars, EOD), MFE/MAE | NEXT | Determine whether any conditional edge persists beyond one bar |
+| 1B | Conditional intraday edge by CPR regime, signal type, direction, time, year | COMPLETE — WIDTH DIAGNOSTICS REVIEWED | Width distribution reviewed; fixed-regime comparison not available because generated signals remain narrow |
+| 1C | Intraday multi-horizon outcomes (1/3/6/12 bars, EOD), MFE/MAE | IN PROGRESS | Determine whether any conditional edge persists beyond one bar |
 | 1D | Intraday event/trade lifecycle with stops, targets and time exits, excluding costs | PLANNED | Compare signal edge with executable trade distributions |
 | 2A | BTST signal characterization | PLANNED | Close-to-next-open and next-day OHLC distributions by CPR regime |
 | 2B | BTST executable lifecycle and realistic costs | PLANNED | Out-of-sample cost-aware results |
@@ -34,11 +34,13 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 7 | Final walk-forward / untouched holdout | PLANNED | No material degradation on unseen data |
 | 8 | Paper-trading signal pipeline | PLANNED | Reproducible live signal generation with explicit execution rules |
 
-## Current step: Phase 1B — width coverage correction
+## Current step: Phase 1C — multi-horizon intraday persistence
 
-The first fixed-threshold conditional run revealed an important structural issue: all 4,281 generated signals fell into the pre-specified narrow regime; there were no neutral or wide signals. Therefore the first conditional output cannot be interpreted as evidence comparing narrow versus wide CPR behavior. The next diagnostic will measure the full daily CPR-width distribution and use non-optimized width quantiles/deciles only as exploratory descriptors. These bins are not trading parameters and will not be promoted directly into a strategy.
+Phase 1B is closed as a diagnostic phase. The full daily CPR-width distribution showed that neutral/wide CPR days exist, but the current directional signal definition generates only narrow-regime signals. Exploratory width deciles showed no statistically convincing monotonic relationship with next-bar outcome. The research therefore moves to a pre-specified horizon test rather than optimizing width thresholds.
 
-The fixed thresholds remain documented as the original hypothesis: narrow < 0.50 ATR, neutral 0.50–1.00 ATR, wide > 1.00 ATR. If the underlying reference distribution never reaches the latter regions, that hypothesis is simply not testable on this dataset under the current signal definition.
+Phase 1C measures the same bias-safe CPR signal from next-bar open across 1, 3, 6 and 12 five-minute bars, plus same-session EOD. Each horizon is session-bounded so an intraday measurement cannot silently become an overnight/BTST test. Outcomes include R-normalized return, win rate, MFE, MAE, quartiles, p-values, direction, entry-time bucket, regime, and yearly stability.
+
+These horizon measurements are descriptive discovery tests. No horizon, width bin, stop, target, or threshold will be selected because it produces the most favorable historical result.
 
 ## Decision gates
 
@@ -55,3 +57,5 @@ The fixed thresholds remain documented as the original hypothesis: narrow < 0.50
 - 2026-09-17: Phase 1A signal-only baseline completed: 4,281 signals; unconditional next-bar mean close outcome approximately zero and not statistically significant.
 - 2026-09-17: Phase 1B conditional decomposition implemented and CI-validated on commit 7332948fe41a34076202279b3fa0591e6c1eda58.
 - 2026-09-17: Phase 1B result reviewed: all 4,281 signals were classified as narrow; fixed 0.50/1.00 ATR thresholds did not produce neutral/wide signal groups. Width-coverage and exploratory decile diagnostics added in commit 8226132a6d5e195013f8b67f2a842d8bc4783526.
+- 2026-09-17: Width diagnostic completed: daily CPR population contained 2,207 narrow, 44 neutral, and 2 wide days; width-vs-next-bar outcome Spearman rho was approximately -0.010 with p approximately 0.50. No width threshold was optimized.
+- 2026-09-17: Phase 1C multi-horizon diagnostic implementation added; horizons are explicitly session-bounded. CI workflow added for reproducible execution.
