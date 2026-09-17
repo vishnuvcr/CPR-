@@ -36,13 +36,17 @@ def prepare(input_path: Path, output_path: Path) -> None:
 
     x = pd.DataFrame(
         {
-            "open": pd.to_numeric(raw["Open"], errors="raise"),
-            "high": pd.to_numeric(raw["High"], errors="raise"),
-            "low": pd.to_numeric(raw["Low"], errors="raise"),
-            "close": pd.to_numeric(raw["Close"], errors="raise"),
+            "open": pd.to_numeric(raw["Open"], errors="coerce"),
+            "high": pd.to_numeric(raw["High"], errors="coerce"),
+            "low": pd.to_numeric(raw["Low"], errors="coerce"),
+            "close": pd.to_numeric(raw["Close"], errors="coerce"),
         },
         index=ts,
     ).sort_index()
+
+    source_missing_ohlc_rows = int(x.isna().any(axis=1).sum())
+    if source_missing_ohlc_rows:
+        print(f"source_rows_with_missing_ohlc={source_missing_ohlc_rows}")
 
     # Regular NSE cash session. We do not fabricate missing source minutes.
     x = x.between_time("09:15", "15:29")
@@ -52,34 +56,55 @@ def prepare(input_path: Path, output_path: Path) -> None:
 
     # Avoid pandas resample origin/offset behaviour differences across pandas
     # versions. Build the bucket explicitly from each timestamp's 5-minute floor.
-    # The session filter above guarantees that only 09:15-15:29 observations are
-    # included, so each bucket is naturally aligned to 09:15, 09:20, ..., 15:25.
+    # The session filter above guarantees alignment to 09:15, 09:20, ..., 15:25.
     bucket = x.index.floor("5min")
-    bars = x.groupby(bucket, sort=True).agg(
+    bars_all = x.groupby(bucket, sort=True).agg(
         open=("open", "first"),
         high=("high", "max"),
         low=("low", "min"),
         close=("close", "last"),
         volume=("volume", "sum"),
     )
-    bars.index.name = "timestamp"
+    bars_all.index.name = "timestamp"
 
-    counts = x["close"].groupby(bucket, sort=True).count().astype("int64")
-    counts.index.name = "timestamp"
+    source_counts = x["close"].groupby(bucket, sort=True).count().astype("int64")
+    source_counts.index.name = "timestamp"
+
+    valid_ohlc = x[["open", "high", "low", "close"]].notna().all(axis=1)
+    valid_counts = valid_ohlc.groupby(bucket, sort=True).sum().astype("int64")
+    valid_counts.index.name = "timestamp"
+
+    # A canonical 5-minute bar must contain all five source observations and
+    # every OHLC value must be present. Incomplete/malformed bins are excluded,
+    # never repaired or forward-filled, and are retained in the audit below.
+    keep = (source_counts == 5) & (valid_counts == 5)
+    bars = bars_all.loc[keep]
+    counts = source_counts.loc[bars.index]
+    valid = valid_counts.loc[bars.index]
 
     if bars.empty:
-        raise ValueError("5-minute aggregation produced zero bars")
+        raise ValueError(
+            "No complete 5-minute bars remain after excluding incomplete/missing-OHLC bins"
+        )
     if bars.isna().any().any():
-        raise ValueError("5-minute aggregation produced NaN OHLCV values")
+        raise ValueError("Canonical 5-minute aggregation produced NaN OHLCV values")
 
-    # Keep a machine-readable completeness audit alongside the canonical data.
-    audit = pd.DataFrame({"source_minute_count": counts}, index=bars.index)
+    # Machine-readable completeness audit for every source-derived bin.
+    audit = pd.DataFrame(
+        {
+            "source_minute_count": source_counts,
+            "valid_ohlc_minute_count": valid_counts,
+            "retained": keep,
+        },
+        index=bars_all.index,
+    )
+    audit.index.name = "timestamp"
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     bars.to_csv(output_path, index_label="timestamp")
     audit.to_csv(output_path.with_suffix(".source_counts.csv"))
 
-    complete_fraction = float((counts == 5).mean()) if len(counts) else 0.0
+    complete_fraction = float(keep.mean()) if len(keep) else 0.0
     provenance = output_path.with_suffix(".provenance.txt")
     provenance.write_text(
         "REFERENCE DATASET\n"
@@ -90,23 +115,28 @@ def prepare(input_path: Path, output_path: Path) -> None:
         "derived_frequency=5-minute\n"
         "volume=0 because spot index has no traded volume\n"
         "session=09:15-15:30 Asia/Kolkata\n"
+        f"source_rows={len(raw)}\n"
         f"source_session_rows={len(x)}\n"
-        f"five_minute_bins={len(bars)}\n"
-        f"complete_5_minute_bins={int((counts == 5).sum())}\n"
+        f"source_rows_with_missing_ohlc={source_missing_ohlc_rows}\n"
+        f"five_minute_bins_before_filter={len(bars_all)}\n"
+        f"five_minute_bins_retained={len(bars)}\n"
+        f"complete_5_minute_bins={int(keep.sum())}\n"
         f"complete_5_minute_fraction={complete_fraction:.6f}\n"
-        f"minimum_source_minutes_per_bin={int(counts.min()) if len(counts) else 0}\n"
-        f"maximum_source_minutes_per_bin={int(counts.max()) if len(counts) else 0}\n"
+        f"minimum_source_minutes_per_bin={int(source_counts.min()) if len(source_counts) else 0}\n"
+        f"maximum_source_minutes_per_bin={int(source_counts.max()) if len(source_counts) else 0}\n"
         "note=Reference dataset only; independently validate against exchange/vendor data before publication.\n"
-        "note=5-minute bars are retained when source observations exist; incomplete-bin statistics are audited separately and are not repaired.\n",
+        "note=Incomplete/missing-OHLC bins are excluded rather than repaired; see .source_counts.csv for the full audit.\n",
         encoding="utf-8",
     )
     print(f"source_rows={len(raw)}")
     print(f"session_source_rows={len(x)}")
     print(f"unique_sessions={x.index.normalize().nunique()}")
-    print(f"five_minute_rows={len(bars)}")
+    print(f"source_rows_with_missing_ohlc={source_missing_ohlc_rows}")
+    print(f"five_minute_bins_before_filter={len(bars_all)}")
+    print(f"five_minute_rows_retained={len(bars)}")
     print(f"complete_5_minute_fraction={complete_fraction:.6f}")
-    print(f"min_source_minutes_per_bin={int(counts.min()) if len(counts) else 0}")
-    print(f"max_source_minutes_per_bin={int(counts.max()) if len(counts) else 0}")
+    print(f"min_source_minutes_per_bin={int(source_counts.min()) if len(source_counts) else 0}")
+    print(f"max_source_minutes_per_bin={int(source_counts.max()) if len(source_counts) else 0}")
     print(f"start={bars.index.min()}")
     print(f"end={bars.index.max()}")
     print(f"output={output_path}")
