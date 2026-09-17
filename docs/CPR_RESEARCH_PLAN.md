@@ -21,7 +21,7 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 |---|---|---|---|
 | 0 | Data integrity, provenance, reproducibility | COMPLETE | Canonical data validates; reproducibility smoke passes |
 | 1A | Unconditional intraday CPR signal edge | COMPLETE | 4,281 signals characterized; unconditional next-bar edge assessed |
-| 1B | Conditional intraday edge by CPR regime, signal type, direction, time, year | IN PROGRESS | Conditional distributions + uncertainty reviewed |
+| 1B | Conditional intraday edge by CPR regime, signal type, direction, time, year | IN PROGRESS — WIDTH DIAGNOSTIC REQUIRED | Fixed CPR regimes must actually partition the data; exploratory width analysis reviewed |
 | 1C | Intraday multi-horizon outcomes (1/3/6/12 bars, EOD), MFE/MAE | NEXT | Determine whether any conditional edge persists beyond one bar |
 | 1D | Intraday event/trade lifecycle with stops, targets and time exits, excluding costs | PLANNED | Compare signal edge with executable trade distributions |
 | 2A | BTST signal characterization | PLANNED | Close-to-next-open and next-day OHLC distributions by CPR regime |
@@ -34,9 +34,11 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 7 | Final walk-forward / untouched holdout | PLANNED | No material degradation on unseen data |
 | 8 | Paper-trading signal pipeline | PLANNED | Reproducible live signal generation with explicit execution rules |
 
-## Current step: Phase 1B
+## Current step: Phase 1B — width coverage correction
 
-The current analysis uses the pre-specified CPR width definitions already in the strategy: narrow < 0.50 ATR, neutral 0.50–1.00 ATR, and wide > 1.00 ATR. It separates narrow breakout and wide reversal signals, long/short direction, entry-time buckets, and yearly stability. The purpose is descriptive/diagnostic, not threshold optimization.
+The first fixed-threshold conditional run revealed an important structural issue: all 4,281 generated signals fell into the pre-specified narrow regime; there were no neutral or wide signals. Therefore the first conditional output cannot be interpreted as evidence comparing narrow versus wide CPR behavior. The next diagnostic will measure the full daily CPR-width distribution and use non-optimized width quantiles/deciles only as exploratory descriptors. These bins are not trading parameters and will not be promoted directly into a strategy.
+
+The fixed thresholds remain documented as the original hypothesis: narrow < 0.50 ATR, neutral 0.50–1.00 ATR, wide > 1.00 ATR. If the underlying reference distribution never reaches the latter regions, that hypothesis is simply not testable on this dataset under the current signal definition.
 
 ## Decision gates
 
@@ -52,3 +54,4 @@ The current analysis uses the pre-specified CPR width definitions already in the
 - 2026-09-17: Fixed-cost intraday baseline completed; results interpreted separately from signal edge because the NIFTY spot/index data and cash-equity cost model are not a clean tradability match.
 - 2026-09-17: Phase 1A signal-only baseline completed: 4,281 signals; unconditional next-bar mean close outcome approximately zero and not statistically significant.
 - 2026-09-17: Phase 1B conditional decomposition implemented and CI-validated on commit 7332948fe41a34076202279b3fa0591e6c1eda58.
+- 2026-09-17: Phase 1B result reviewed: all 4,281 signals were classified as narrow; fixed 0.50/1.00 ATR thresholds did not produce neutral/wide signal groups. Width-coverage and exploratory decile diagnostics added in commit 8226132a6d5e195013f8b67f2a842d8bc4783526.
