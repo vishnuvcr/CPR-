@@ -1,0 +1,53 @@
+name: CPR BTST characterization
+
+on:
+  push:
+    branches: [cpr-v1.0-scientific-multi-dimensional-testing]
+    paths:
+      - 'scripts/run_btst_characterization.py'
+      - 'scripts/prepare_reference_nifty.py'
+      - 'cpr_lab/**'
+      - '.github/workflows/btst-characterization.yml'
+  workflow_dispatch:
+
+jobs:
+  btst:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package
+        run: pip install -e '.[dev]'
+      - name: Download pinned reference dataset
+        run: |
+          mkdir -p data/raw data/canonical
+          curl -L --fail --retry 3 -o data/raw/nifty50_candlestick_data.csv \
+            https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv
+      - name: Convert to canonical 5-minute OHLCV
+        run: python scripts/prepare_reference_nifty.py --input data/raw/nifty50_candlestick_data.csv --output data/canonical/nifty50_5m.csv --source-counts-output data/canonical/source_counts.csv
+      - name: Validate canonical data
+        run: python -m cpr_lab.data_quality data/canonical/nifty50_5m.csv
+      - name: Run Phase 2A BTST characterization
+        run: |
+          rm -rf artifacts/btst
+          python scripts/run_btst_characterization.py --input data/canonical/nifty50_5m.csv --output-dir artifacts/btst
+      - name: Validate Phase 2A artifacts
+        run: |
+          test -s artifacts/btst/btst_events.csv
+          test -s artifacts/btst/btst_metrics.csv
+          test -s artifacts/btst/btst_yearly_metrics.csv
+          python - <<'PY'
+          import pandas as pd
+          m = pd.read_csv('artifacts/btst/btst_metrics.csv')
+          assert set(['overnight','nextday']).issubset(set(m.horizon))
+          assert (m[m.group == 'ALL'].signals > 0).all()
+          print(m[m.group.isin(['ALL','LONG','SHORT'])].to_string(index=False))
+          PY
+      - name: Upload Phase 2A artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpr-btst-characterization
+          path: artifacts/btst/
+          retention-days: 90
