@@ -41,8 +41,9 @@ jobs:
           python - <<'PY'
           import pandas as pd
           m = pd.read_csv('artifacts/btst/btst_metrics.csv')
-          assert set(['overnight','nextday']).issubset(set(m.horizon))
-          assert (m[m.group == 'ALL'].signals > 0).all()
+          all_rows = m[m.group == 'ALL']
+          assert set(['overnight','nextday']) == set(all_rows.horizon)
+          assert (all_rows.signals > 0).all()
           print(m[m.group.isin(['ALL','LONG','SHORT'])].to_string(index=False))
           PY
       - name: Upload Phase 2A artifacts
