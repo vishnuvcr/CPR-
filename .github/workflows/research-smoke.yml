@@ -1,0 +1,65 @@
+name: CPR reproducibility smoke
+
+on:
+  push:
+    branches:
+      - cpr-v1.0-scientific-multi-dimensional-testing
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e .
+      - run: python -m pip install pytest
+      - name: Run unit tests
+        run: python -m pytest -q
+      - name: Generate deterministic OHLCV
+        run: python scripts/generate_synthetic_ohlcv.py --days 520 --output data/wfo_smoke.csv
+      - name: Run WFO smoke
+        run: python scripts/run_wfo.py --input data/wfo_smoke.csv --format csv --output wfo_smoke.csv
+      - name: Validate WFO artifact
+        run: |
+          test -s wfo_smoke.csv
+          python - <<'PY'
+          import pandas as pd
+          x = pd.read_csv('wfo_smoke.csv')
+          assert len(x) > 0, 'WFO produced no rows'
+          required = {'param_narrow_x','param_wide_y','param_atr_stop','param_target_r'}
+          assert required.issubset(x.columns), f'missing columns: {required-set(x.columns)}'
+          print('WFO smoke rows:', len(x))
+          PY
+      - name: Generate deterministic MC trades
+        run: |
+          python - <<'PY'
+          import numpy as np, pandas as pd
+          rng = np.random.default_rng(20260917)
+          n = 500
+          wins = rng.random(n) < 0.55
+          returns = np.where(wins, 1.5, -1.0)
+          pd.DataFrame({'return_on_risk': returns}).to_csv('mc_trades.csv', index=False)
+          PY
+      - name: Run 10000-path Monte Carlo
+        run: >-
+          python scripts/run_monte_carlo.py
+          --input mc_trades.csv
+          --column return_on_risk
+          --risk 0.01
+          --paths 10000
+          --trades 100
+          --block-size 5
+          | tee monte_carlo.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpr-v1-smoke-results
+          path: |
+            wfo_smoke.csv
+            monte_carlo.txt
