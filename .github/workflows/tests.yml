@@ -7,6 +7,17 @@ on:
       - cpr-v1.0-scientific-multi-dimensional-testing
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_mode:
+        description: "Research test mode"
+        required: true
+        default: "unit"
+        type: choice
+        options:
+          - unit
+          - monte_carlo
+          - wfo
 
 jobs:
   unit-tests:
