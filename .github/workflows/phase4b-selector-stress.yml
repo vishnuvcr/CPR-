@@ -41,12 +41,13 @@ jobs:
       - name: Recreate corrected Phase 4 selector artifact
         run: python scripts/run_cross_horizon_selector.py --input artifacts/swing/swing_events.csv --output-dir artifacts/cross-horizon
       - name: Run Phase 4B stress test
-        run: python scripts/run_phase4b_selector_stress.py \
-          --selected artifacts/cross-horizon/cross_horizon_selected_events.csv \
-          --events artifacts/swing/swing_events.csv \
-          --selections artifacts/cross-horizon/cross_horizon_selections.csv \
-          --output-dir artifacts/phase4b \
-          --simulations 5000
+        run: |
+          python scripts/run_phase4b_selector_stress.py \
+            --selected artifacts/cross-horizon/cross_horizon_selected_events.csv \
+            --events artifacts/swing/swing_events.csv \
+            --selections artifacts/cross-horizon/cross_horizon_selections.csv \
+            --output-dir artifacts/phase4b \
+            --simulations 5000
       - name: Validate Phase 4B outputs
         run: |
           test -s artifacts/phase4b/phase4b_random_horizon_null.csv
