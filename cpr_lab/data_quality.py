@@ -6,6 +6,7 @@ import pandas as pd
 
 
 REQUIRED_OHLCV = ("open", "high", "low", "close", "volume")
+RESEARCH_TIMEZONE = "Asia/Kolkata"
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,15 @@ def validate_ohlcv(df: pd.DataFrame) -> DataQualityReport:
         raise TypeError("OHLCV index must be a DatetimeIndex")
 
     numeric = df.loc[:, REQUIRED_OHLCV].apply(pd.to_numeric, errors="coerce")
-    invalid_ohlc = int(((numeric.high < numeric.low) | (numeric.open > numeric.high) | (numeric.open < numeric.low) | (numeric.close > numeric.high) | (numeric.close < numeric.low)).sum())
+    invalid_ohlc = int(
+        (
+            (numeric.high < numeric.low)
+            | (numeric.open > numeric.high)
+            | (numeric.open < numeric.low)
+            | (numeric.close > numeric.high)
+            | (numeric.close < numeric.low)
+        ).sum()
+    )
     missing_ohlcv = int(numeric.isna().any(axis=1).sum())
     non_positive = int((numeric[["open", "high", "low", "close"]] <= 0).any(axis=1).sum())
     negative_volume = int((numeric.volume < 0).sum())
@@ -65,7 +74,17 @@ def load_ohlcv_csv(path: str, timestamp_col: str = "timestamp") -> pd.DataFrame:
     x = pd.read_csv(path)
     if timestamp_col not in x.columns:
         raise ValueError(f"Missing timestamp column: {timestamp_col}")
-    x[timestamp_col] = pd.to_datetime(x[timestamp_col], errors="raise")
+
+    parsed = pd.to_datetime(x[timestamp_col], errors="raise")
+    # CSV serialization preserves a numeric UTC offset (e.g. +05:30), not the
+    # IANA zone name. Normalize all timezone-aware timestamps back to the
+    # research zone so downstream checks can rely on Asia/Kolkata semantics.
+    if parsed.dt.tz is None:
+        parsed = parsed.dt.tz_localize(RESEARCH_TIMEZONE)
+    else:
+        parsed = parsed.dt.tz_convert(RESEARCH_TIMEZONE)
+    x[timestamp_col] = parsed
+
     x = x.set_index(timestamp_col).sort_index()
     report = validate_ohlcv(x)
     if not report.passed:
