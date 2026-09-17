@@ -18,6 +18,12 @@ class WFOFold:
 
 
 def make_folds(index: pd.DatetimeIndex, train_periods: int = 252, test_periods: int = 63, step: int = 63):
+    """Create chronological folds on the supplied period index.
+
+    For intraday data, pass a DAILY index so 252/63 means trading days rather
+    than 5-minute bars. The returned timestamps are then used to slice the
+    higher-frequency dataframe.
+    """
     idx = pd.DatetimeIndex(index).sort_values().unique()
     i = train_periods
     while i + test_periods <= len(idx):
@@ -40,11 +46,19 @@ def optimize_wfo(
     train_periods: int = 252,
     test_periods: int = 63,
     step: int = 63,
+    fold_index: pd.DatetimeIndex | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Select parameters on each train fold and freeze them on the subsequent test fold."""
+    """Select parameters on each train fold and freeze them on the next test fold.
+
+    ``fold_index`` controls the unit of time used by the WFO schedule. This is
+    essential for intraday datasets: use the daily index for a 252/63/63
+    trading-day protocol while retaining the original intraday bars for
+    strategy evaluation.
+    """
+    schedule_index = fold_index if fold_index is not None else data.index
     folds = []
     test_frames = []
-    for f in make_folds(data.index, train_periods, test_periods, step):
+    for f in make_folds(schedule_index, train_periods, test_periods, step):
         train = data.loc[f["train"][0] : f["train"][1]]
         test = data.loc[f["test"][0] : f["test"][1]]
         scores = [(params, evaluator(train, params)) for params in parameter_grid]
