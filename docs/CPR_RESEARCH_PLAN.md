@@ -24,9 +24,9 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 1B | Conditional intraday edge by CPR regime, signal type, direction, time, year | COMPLETE — WIDTH DIAGNOSTICS REVIEWED | Width distribution reviewed; fixed-regime comparison not available because generated signals remain narrow |
 | 1C | Intraday multi-horizon outcomes (1/3/6/12 bars, EOD), MFE/MAE | COMPLETE — NO STABLE INTRADAY EDGE ESTABLISHED | Pre-specified horizons characterized without evidence of a statistically reliable overall effect |
 | 1D | Intraday event/trade lifecycle with stops, targets and time exits, excluding costs | DEFERRED | Revisit only if later evidence provides a justified intraday hypothesis |
-| 2A | BTST signal characterization | IN PROGRESS — LOOK-AHEAD CORRECTION APPLIED | Bias-safe end-of-session signal; close-to-next-open and next-day OHLC distributions by CPR regime |
-| 2B | BTST executable lifecycle and realistic costs | PLANNED | Out-of-sample cost-aware results |
-| 3A | Swing horizons (2/3/5/10 sessions) | PLANNED | Horizon-dependent CPR effect characterized |
+| 2A | BTST signal characterization | COMPLETE — LOW SAMPLE / NO STABLE SEPARATION | Bias-safe end-of-session signal characterized; only 31 valid events, with no stable aggregate or year-wise separation |
+| 2B | BTST executable lifecycle and realistic costs | DEFERRED | Revisit only if a later, independently justified BTST hypothesis provides sufficient signal density |
+| 3A | Swing horizons (2/3/5/10 sessions) | IN PROGRESS | Horizon-dependent CPR effect characterized without threshold optimization |
 | 3B | Swing executable lifecycle and costs | PLANNED | Out-of-sample cost-aware results |
 | 4 | Cross-horizon conditional selector | PLANNED | Predefined features select horizon without leakage |
 | 5 | ML model as regime/horizon selector | PLANNED | Walk-forward validation beats appropriate baselines after costs |
@@ -34,11 +34,11 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 7 | Final walk-forward / untouched holdout | PLANNED | No material degradation on unseen data |
 | 8 | Paper-trading signal pipeline | PLANNED | Reproducible live signal generation with explicit execution rules |
 
-## Current step: Phase 2A — BTST signal characterization
+## Current step: Phase 3A — Swing horizon characterization
 
-Phase 1C tested the unchanged bias-safe CPR directional signal from next-bar open across 1, 3, 6 and 12 five-minute bars plus same-session EOD. The aggregate results did not establish a statistically reliable intraday effect, so the research now tests whether the information content is expressed across the session boundary instead.
+Phase 2A used a deliberately strict executable BTST definition: only the final completed bar of each source session could generate the signal, with the next session open as the entry. The corrected CI run completed successfully with temporal-integrity validation. It produced 31 valid end-of-session signals across 2015–2023. Aggregate overnight mean outcome was -0.044 R (p=0.313) and next-session mean outcome was -0.077 R (p=0.369). LONG/SHORT and yearly results were mixed rather than showing stable separation; several yearly groups contain only 1–7 observations. Because the sample is sparse, this is not evidence that BTST can never work, but it does not justify an executable BTST branch at this stage.
 
-Phase 2A measures two pre-specified quantities without costs: (1) source-session close to next-session open, representing the overnight/BTST gap; and (2) next-session open to next-session close, representing a one-session hold. Next-session high/low are used for MFE/MAE. BTST eligibility is restricted to the final completed bar of each source session, so the signal cannot use the later same-day close. The next session open is the executable entry. Results are reported by direction, fixed CPR regime, signal-time bucket, and year. No width bin, holding rule, stop, target, or threshold is selected from historical profitability.
+Phase 3A therefore tests whether the unchanged bias-safe CPR directional signal has information at pre-specified swing horizons of 2, 3, 5 and 10 trading sessions. The signal is evaluated at a completed source bar and executed at the following bar open, exactly as in Phase 1C. Outcomes will be measured from that executable entry to the close of each specified future session, with MFE/MAE and direction/year/regime/time descriptions. No horizon, width threshold, stop, target, or subgroup will be selected from observed profitability.
 
 ## Decision gates
 
@@ -61,3 +61,4 @@ Phase 2A measures two pre-specified quantities without costs: (1) source-session
 - 2026-09-18: Phase 2A BTST characterization implementation and CI workflow added.
 - 2026-09-18: BTST workflow initially failed during canonicalization because an unsupported --source-counts-output argument was passed; the workflow was corrected.
 - 2026-09-18: BTST characterization was audited for temporal leakage. The original implementation used the full source-session close for intraday signals generated before that close. BTST logic was corrected to use only the final completed source-session bar and the next-session open as the executable entry. CI now explicitly validates one end-of-session event per source day and final-bar timing.
+- 2026-09-18: Phase 2A rerun completed successfully after fixing the summary outcome-column collision. Artifact validation and timing-integrity checks passed. The corrected characterization produced 31 valid end-of-session events; aggregate overnight and next-session outcomes did not show stable separation, and yearly sample sizes were too small for a stability claim. Phase 2B is therefore deferred and Phase 3A swing-horizon characterization is advanced.
