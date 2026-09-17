@@ -40,17 +40,21 @@ jobs:
           test -s artifacts/cross-horizon/cross_horizon_selections.csv
           test -s artifacts/cross-horizon/cross_horizon_selected_events.csv
           test -s artifacts/cross-horizon/cross_horizon_oos_comparison.csv
+          test -s artifacts/cross-horizon/cross_horizon_paired_oos.csv
           test -s artifacts/cross-horizon/cross_horizon_oos_yearly.csv
           python - <<'PY'
           import pandas as pd
           s=pd.read_csv('artifacts/cross-horizon/cross_horizon_selections.csv', parse_dates=['train_end','purge_start','validation_start','validation_end'])
           o=pd.read_csv('artifacts/cross-horizon/cross_horizon_selected_events.csv', parse_dates=['entry_session','target_session'])
           c=pd.read_csv('artifacts/cross-horizon/cross_horizon_oos_comparison.csv')
+          p=pd.read_csv('artifacts/cross-horizon/cross_horizon_paired_oos.csv')
           assert len(s)>=8 and set(s.side)=={'LONG','SHORT'}
           assert set(s.entry_bucket).issubset({'09:15-10:00','10:01-12:00','12:01-14:00','14:01+'})
           assert set(s.selected_horizon).issubset({'2session','3session','5session','10session'})
           assert len(o)>0
           assert set(c.strategy)=={'SELECTED','2session','3session','5session','10session'}
+          assert len(p)==4
+          assert set(p.comparison)=={'SELECTED_vs_2session','SELECTED_vs_3session','SELECTED_vs_5session','SELECTED_vs_10session'}
           assert (s.train_end < s.purge_start).all()
           assert (s.purge_start < s.validation_start).all()
           intervals=s[['split','train_end','purge_start','validation_start','validation_end']].drop_duplicates().sort_values('split')
@@ -60,8 +64,9 @@ jobs:
           if len(intervals)>1:
               assert (intervals.validation_end.iloc[:-1].to_numpy() < intervals.validation_start.iloc[1:].to_numpy()).all()
           assert (o.entry_session <= o.target_session).all()
-          print('Phase 4 validation: PASS')
+          print('Phase 4 validation: PASS — identical-signal paired benchmark present')
           print(c.to_string(index=False))
+          print(p.to_string(index=False))
           print(pd.read_csv('artifacts/cross-horizon/cross_horizon_oos_yearly.csv').to_string(index=False))
           PY
       - name: Upload Phase 4 artifacts
