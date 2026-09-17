@@ -1,0 +1,58 @@
+name: CPR Phase 1C — manual research run
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  multihorizon:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Download pinned reference dataset
+        run: |
+          mkdir -p data/reference
+          curl -L --fail --retry 3 -o data/reference/nifty50_source.csv https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv
+      - name: Convert to canonical 5-minute OHLCV
+        run: python scripts/prepare_reference_nifty.py --input data/reference/nifty50_source.csv --output data/reference/nifty50_5m.csv
+      - name: Validate canonical data
+        run: |
+          python - <<'PY'
+          from cpr_lab.data_quality import load_ohlcv_csv
+          x=load_ohlcv_csv('data/reference/nifty50_5m.csv')
+          assert len(x)>10000
+          assert str(x.index.tz)=='Asia/Kolkata'
+          print(f'rows={len(x)} start={x.index.min()} end={x.index.max()}')
+          PY
+      - name: Run Phase 1C diagnostics
+        run: python scripts/run_intraday_multihorizon.py --input data/reference/nifty50_5m.csv --output-dir artifacts
+      - name: Validate Phase 1C artifacts
+        run: |
+          test -s artifacts/multihorizon_events.csv
+          test -s artifacts/multihorizon_metrics.csv
+          test -s artifacts/multihorizon_yearly_metrics.csv
+          python - <<'PY'
+          import pandas as pd
+          m=pd.read_csv('artifacts/multihorizon_metrics.csv')
+          required={'1bar','3bar','6bar','12bar','EOD'}
+          assert required.issubset(set(m.horizon)), sorted(set(m.horizon))
+          all_rows=m[m.group=='ALL']
+          assert required.issubset(set(all_rows.horizon))
+          assert (all_rows.signals > 0).all()
+          print(all_rows.to_string(index=False))
+          PY
+      - name: Upload Phase 1C artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpr-intraday-multihorizon
+          path: |
+            artifacts/*
+            data/reference/nifty50_5m.provenance.txt
+            data/reference/nifty50_5m.source_counts.csv
