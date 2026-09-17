@@ -30,7 +30,9 @@ def simulate_single_position(
 
     Signals are evaluated on bar close and, by default, executed at the next bar open.
     If stop and target are both touched in one bar, the stop is assumed to execute first
-    (conservative bar-resolution rule).
+    (conservative bar-resolution rule). Once account equity reaches zero, the account is
+    treated as liquidated and no new positions are opened; this prevents negative-equity
+    risk sizing from creating artificial position-size explosions.
     """
     x = bars.copy().sort_index()
     equity = config.initial_capital
@@ -40,6 +42,7 @@ def simulate_single_position(
     qty = 0.0
     trades = []
     equity_curve = []
+    liquidated = False
 
     for i, (ts, row) in enumerate(x.iterrows()):
         # Mark existing position to market at current close before handling new signal.
@@ -77,6 +80,10 @@ def simulate_single_position(
                 fee = costs.transaction_cost(buy_value, sell_value, asset=config.asset, orders=2)
                 net = gross - fee
                 equity += net
+                if equity <= 0:
+                    equity = 0.0
+                    liquidated = True
+
                 trades.append({
                     "entry_time": entry_ts,
                     "exit_time": ts,
@@ -89,13 +96,16 @@ def simulate_single_position(
                     "net_pnl": net,
                     "return_on_risk": net / max(abs(qty * (entry_price - stop)), 1e-12),
                     "exit_reason": exit_reason,
+                    "account_liquidated": liquidated,
                 })
                 position = None
                 entry_price = stop = target = entry_ts = None
                 qty = 0.0
+                if liquidated:
+                    break
                 continue
 
-        if position is None and i + 1 < len(x):
+        if position is None and not liquidated and equity > 0 and i + 1 < len(x):
             next_row = x.iloc[i + 1]
             next_ts = x.index[i + 1]
             side = "LONG" if bool(row.get(long_col, False)) else "SHORT" if bool(row.get(short_col, False)) else None
@@ -111,15 +121,17 @@ def simulate_single_position(
                 target_price = fill + target_r * risk_distance if direction == 1 else fill - target_r * risk_distance
                 capital_at_risk = equity * config.risk_per_trade
                 q = capital_at_risk / risk_distance
-                notional = q * fill
-                q *= min(1.0, (equity * config.max_leverage) / max(notional, 1e-12))
+                # Enforce leverage on absolute notional and never allow negative
+                # equity/position sizes to enter the sizing calculation.
+                max_qty = (equity * config.max_leverage) / max(abs(fill), 1e-12)
+                q = min(q, max_qty)
                 if q <= 0:
                     continue
                 position = side
                 entry_price, stop, target, entry_ts, qty = fill, stop_price, target_price, next_ts, q
 
-    # Close any open position at last close.
-    if position is not None:
+    # Close any open position at last close, unless the account already liquidated.
+    if position is not None and not liquidated:
         ts = x.index[-1]
         price_raw = float(x.iloc[-1].close)
         direction = 1 if position == "LONG" else -1
@@ -130,12 +142,16 @@ def simulate_single_position(
         fee = costs.transaction_cost(buy_value, sell_value, asset=config.asset, orders=2)
         net = gross - fee
         equity += net
+        if equity <= 0:
+            equity = 0.0
+            liquidated = True
         trades.append({
             "entry_time": entry_ts, "exit_time": ts, "side": position,
             "entry_price": entry_price, "exit_price": fill, "qty": qty,
             "gross_pnl": gross, "costs": fee, "net_pnl": net,
             "return_on_risk": net / max(abs(qty * (entry_price - stop)), 1e-12),
             "exit_reason": "end_of_test",
+            "account_liquidated": liquidated,
         })
         equity_curve.append((ts, equity))
 
