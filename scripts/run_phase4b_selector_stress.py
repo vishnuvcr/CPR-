@@ -18,9 +18,9 @@ N_SIMULATIONS = 5000
 BLOCKS = 10
 
 
-def daily_mean(df: pd.DataFrame) -> float:
-    d = df.groupby("signal_day", as_index=False).return_R.mean()
-    return float(d.return_R.mean())
+def daily_mean(df: pd.DataFrame, value_col: str = "return_R") -> float:
+    d = df.groupby("signal_day", as_index=False)[value_col].mean()
+    return float(d[value_col].mean())
 
 
 def block_bootstrap_mean(diff: np.ndarray, rng: np.random.Generator, n_boot: int = 5000) -> tuple[float, float]:
@@ -52,27 +52,21 @@ def main() -> None:
     selected["signal_day"] = selected.signal_date.dt.normalize()
     events["signal_day"] = events.signal_date.dt.normalize()
 
-    # Exact signal identities used by Phase 4 OOS.
     keys = selected[["split", "signal_time", "side", "entry_bucket"]].drop_duplicates()
     assert len(keys) == len(selected), "Selected OOS contains duplicate signal identities"
     base = events.merge(keys, on=["signal_time", "side", "entry_bucket"], how="inner", suffixes=("", "_key"))
     assert len(base) == len(keys) * len(HORIZONS), "Each selected signal must have all four horizon outcomes"
 
-    # Reconstruct the actual selected OOS return using the horizon recorded by the selector.
-    chosen = selected[["split", "signal_time", "side", "entry_bucket", "horizon", "return_R"]].copy()
+    chosen = selected[["split", "signal_time", "side", "entry_bucket", "horizon", "return_R", "signal_day"]].copy()
     actual = chosen.rename(columns={"horizon": "selected_horizon", "return_R": "selected_R"})
-    actual_daily = actual.groupby("split", as_index=False).selected_R.mean()
-    actual_mean = float(actual.selected_R.groupby(actual.split).mean().mean())
+    actual_for_mean = actual.rename(columns={"selected_R": "return_R"})
+    actual_mean = daily_mean(actual_for_mean)
 
-    # Signal-level benchmark returns on the identical OOS signal set.
     fixed_rows = []
     for h in HORIZONS:
         q = base[base.horizon == h].copy()
-        q["return"] = q.return_R
         fixed_rows.append((h, q))
 
-    # Random-horizon null: preserve split/cell selection frequency while destroying
-    # the learned relationship. One random horizon is assigned to each split/cell.
     rng = np.random.default_rng(SEED)
     sim_means = np.empty(a.simulations)
     sim_diffs = np.empty(a.simulations)
@@ -104,7 +98,6 @@ def main() -> None:
     null_summary.to_csv(out / "phase4b_random_horizon_null.csv", index=False)
     pd.DataFrame({"simulation": np.arange(a.simulations), "null_mean_R": sim_means, "selected_minus_null_R": sim_diffs}).to_csv(out / "phase4b_null_distribution.csv", index=False)
 
-    # Paired actual-vs-fixed daily differences with dependence-aware block bootstrap CI.
     paired_rows = []
     for h, q in fixed_rows:
         fixed = q.groupby("signal_day", as_index=False).return.mean().rename(columns={"return": "fixed_R"})
@@ -123,7 +116,6 @@ def main() -> None:
         })
     pd.DataFrame(paired_rows).to_csv(out / "phase4b_paired_bootstrap.csv", index=False)
 
-    # Selection concentration: if one horizon dominates, the selector is close to a fixed rule.
     concentration = selections.groupby("selected_horizon").size().reindex(HORIZONS, fill_value=0).reset_index(name="selection_cells")
     concentration["fraction"] = concentration.selection_cells / concentration.selection_cells.sum()
     concentration.to_csv(out / "phase4b_selection_concentration.csv", index=False)
