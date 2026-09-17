@@ -1,7 +1,9 @@
 """Phase 2A: cost-free BTST/overnight characterization of CPR signals.
 
-Discovery-only diagnostic. Signal generation is unchanged and bias-safe; no
-threshold, horizon, or subgroup is optimized from the observed outcomes.
+Discovery-only diagnostic. BTST is defined from an end-of-session signal:
+only the final completed bar of each session is eligible. The next session
+open is the executable entry, so no same-session future close is used.
+No threshold, horizon, or subgroup is optimized from observed outcomes.
 """
 from __future__ import annotations
 
@@ -63,10 +65,11 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
 
     bars = load_ohlcv_csv(a.input)
-    daily = bars.resample("1D").agg({"open":"first","high":"max","low":"min","close":"last","volume":"sum"}).dropna()
+    daily = bars.resample("1D").agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}).dropna()
     x = add_intraday_daily_features(bars, daily_reference_features(daily))
     signals = intraday_directional_signals(
-        x, StrategyConfig(narrow_x=NARROW_X, wide_y=WIDE_Y, atr_stop=1.0, target_r=2.0, exit_time="15:15")
+        x,
+        StrategyConfig(narrow_x=NARROW_X, wide_y=WIDE_Y, atr_stop=1.0, target_r=2.0, exit_time="15:15"),
     )
 
     # Session metadata from the canonical intraday series.
@@ -75,15 +78,23 @@ def main() -> None:
     next_session = {sessions[i]: sessions[i + 1] for i in range(len(sessions) - 1)}
 
     rows: list[dict[str, object]] = []
-    for i in range(len(x) - 1):
+    for d in sessions[:-1]:
+        session_mask = session_dates == d
+        session_indices = np.flatnonzero(session_mask.to_numpy())
+        if len(session_indices) == 0:
+            continue
+        i = int(session_indices[-1])
         ts = x.index[i]
+
+        # BTST must use a signal known at the completed session close.
+        # Intraday signals earlier in the day are intentionally excluded so
+        # the outcome cannot depend on the later same-day close.
         side = "LONG" if bool(signals.loc[ts, "long_entry"]) else "SHORT" if bool(signals.loc[ts, "short_entry"]) else None
         atr = x.iloc[i].get("D_ATR20")
         width = x.iloc[i].get("D_CPR_width_ATR_ratio")
         if side is None or pd.isna(atr) or float(atr) <= 0 or pd.isna(width):
             continue
 
-        d = ts.date()
         nd = next_session.get(d)
         if nd is None:
             continue
@@ -93,17 +104,16 @@ def main() -> None:
 
         direction = 1 if side == "LONG" else -1
         regime, bucket = classify(ts, float(width))
-        entry = float(x.iloc[i + 1].open) if i + 1 < len(x) and x.index[i + 1].date() == d else float(x.loc[session_dates == d].iloc[-1].close)
-        same_day_close = float(x.loc[session_dates == d].iloc[-1].close)
+        source_close = float(x.iloc[i].close)
         next_open = float(next_rows.iloc[0].open)
         next_close = float(next_rows.iloc[-1].close)
         next_high = float(next_rows.high.max())
         next_low = float(next_rows.low.min())
         atr_f = float(atr)
 
-        # BTST is explicitly defined as source-session close to next-session open.
-        overnight_pnl = direction * (next_open - same_day_close)
-        # Next-day holding starts at next-session open and exits at next-session close.
+        # Signal is evaluated at today's completed close; executable entry is
+        # tomorrow's first bar open. This is the bias-safe BTST definition.
+        overnight_pnl = direction * (next_open - source_close)
         nextday_pnl = direction * (next_close - next_open)
         future = next_rows
         mfe = direction * ((future.high.max() if direction == 1 else future.low.min()) - next_open)
@@ -117,12 +127,12 @@ def main() -> None:
             "regime": regime,
             "entry_bucket": bucket,
             "width_ratio": float(width),
-            "source_close": same_day_close,
+            "source_close": source_close,
             "next_open": next_open,
             "next_close": next_close,
             "next_high": next_high,
             "next_low": next_low,
-            "overnight_return_pct": 100 * overnight_pnl / same_day_close,
+            "overnight_return_pct": 100 * overnight_pnl / source_close,
             "overnight_R": overnight_pnl / atr_f,
             "nextday_return_pct": 100 * nextday_pnl / next_open,
             "return_R": nextday_pnl / atr_f,
@@ -132,7 +142,7 @@ def main() -> None:
 
     events = pd.DataFrame(rows)
     if events.empty:
-        raise SystemExit("No valid BTST signals")
+        raise SystemExit("No valid end-of-session BTST signals")
     events.to_csv(out / "btst_events.csv", index=False)
 
     summaries = []
@@ -141,19 +151,22 @@ def main() -> None:
         summaries.append(summarize(z0, "ALL", horizon))
         for side in ("LONG", "SHORT"):
             q = z0[z0.side == side]
-            if len(q): summaries.append(summarize(q, side, horizon))
+            if len(q):
+                summaries.append(summarize(q, side, horizon))
         for regime in ("narrow", "neutral", "wide"):
             q = z0[z0.regime == regime]
-            if len(q): summaries.append(summarize(q, f"regime={regime}", horizon))
+            if len(q):
+                summaries.append(summarize(q, f"regime={regime}", horizon))
         for bucket in ("09:15-10:00", "10:01-12:00", "12:01-14:00", "14:01+"):
             q = z0[z0.entry_bucket == bucket]
-            if len(q): summaries.append(summarize(q, f"entry={bucket}", horizon))
+            if len(q):
+                summaries.append(summarize(q, f"entry={bucket}", horizon))
 
     metrics = pd.DataFrame(summaries)
     metrics.to_csv(out / "btst_metrics.csv", index=False)
 
     yearly = []
-    for (year, horizon), z in events.assign(_dummy=1).groupby(["year", "_dummy"]):
+    for year, z in events.groupby("year"):
         for h, col in (("overnight", "overnight_R"), ("nextday", "return_R")):
             zz = z.rename(columns={col: "return_R"})
             yearly.append(summarize(zz, f"year={year}", h))
