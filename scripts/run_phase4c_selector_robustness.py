@@ -73,7 +73,9 @@ def split_summary(selected: pd.DataFrame) -> pd.DataFrame:
 
 
 def fixed_horizon_summary(selected: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame:
-    keys = selected[["signal_time", "side", "entry_bucket", "signal_day"]].drop_duplicates()
+    # Do not merge signal_day from selected because events already carries its
+    # own signal_day; retaining both would create signal_day_x/signal_day_y.
+    keys = selected[["signal_time", "side", "entry_bucket"]].drop_duplicates()
     base = events.merge(keys, on=["signal_time", "side", "entry_bucket"], how="inner")
     rows = []
     for h in HORIZONS:
@@ -99,7 +101,6 @@ def main() -> None:
     actual = outcome_for_mapping(selected, events, actual_mapping(selections))
     actual_mean = daily_mean(actual, "mapped_R")
 
-    # Descriptive chronological stability; no split is treated as independently powered.
     ss = split_summary(selected)
     ss["actual_selected"] = True
     ss.to_csv(out / "phase4c_split_stability.csv", index=False)
@@ -145,8 +146,6 @@ def main() -> None:
     placebo_summary.to_csv(out / "phase4c_temporal_placebo.csv", index=False)
     pd.DataFrame({"simulation": np.arange(a.simulations), "placebo_mean_R": placebo_means}).to_csv(out / "phase4c_temporal_placebo_distribution.csv", index=False)
 
-    # Stale-selector diagnostic: use the prior split's chosen horizon for the
-    # current split. This is descriptive and deliberately non-optimized.
     stale = cells.sort_values(["side", "entry_bucket", "split"]).copy()
     stale["mapped_horizon"] = stale.groupby(["side", "entry_bucket"]).selected_horizon.shift(1)
     stale = stale.dropna(subset=["mapped_horizon"])
@@ -161,7 +160,6 @@ def main() -> None:
         "lagged_signal_days": stale_q.signal_day.nunique(),
     }]).to_csv(out / "phase4c_lagged_selection.csv", index=False)
 
-    # Direction/time decomposition of actual selected OOS result.
     g = actual.groupby(["side", "entry_bucket"], as_index=False).agg(
         signals=("mapped_R", "size"), mean_R=("mapped_R", "mean"),
         median_R=("mapped_R", "median"), win_rate=("mapped_R", lambda x: float((x > 0).mean()))
