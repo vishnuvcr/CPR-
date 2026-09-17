@@ -32,17 +32,17 @@ def pvalue_mean(values: pd.Series) -> float:
         return float("nan")
 
 
-def summarize(z: pd.DataFrame, group: str, horizon: str) -> dict[str, object]:
-    r = z["return_R"]
+def summarize(z: pd.DataFrame, outcome_col: str, group: str, horizon: str) -> dict[str, object]:
+    r = pd.to_numeric(z[outcome_col], errors="coerce").dropna()
     return {
         "group": group,
         "horizon": horizon,
-        "signals": len(z),
+        "signals": len(r),
         "mean_R": r.mean(),
         "median_R": r.median(),
         "win_rate": (r > 0).mean(),
-        "mean_MFE_R": z.mfe_R.mean(),
-        "mean_MAE_R": z.mae_R.mean(),
+        "mean_MFE_R": pd.to_numeric(z.loc[r.index, "mfe_R"], errors="coerce").mean(),
+        "mean_MAE_R": pd.to_numeric(z.loc[r.index, "mae_R"], errors="coerce").mean(),
         "p25_R": r.quantile(.25),
         "p75_R": r.quantile(.75),
         "p_value_mean_R": pvalue_mean(r),
@@ -147,20 +147,19 @@ def main() -> None:
 
     summaries = []
     for horizon, col in (("overnight", "overnight_R"), ("nextday", "return_R")):
-        z0 = events.rename(columns={col: "return_R"})
-        summaries.append(summarize(z0, "ALL", horizon))
+        summaries.append(summarize(events, col, "ALL", horizon))
         for side in ("LONG", "SHORT"):
-            q = z0[z0.side == side]
+            q = events[events.side == side]
             if len(q):
-                summaries.append(summarize(q, side, horizon))
+                summaries.append(summarize(q, col, side, horizon))
         for regime in ("narrow", "neutral", "wide"):
-            q = z0[z0.regime == regime]
+            q = events[events.regime == regime]
             if len(q):
-                summaries.append(summarize(q, f"regime={regime}", horizon))
+                summaries.append(summarize(q, col, f"regime={regime}", horizon))
         for bucket in ("09:15-10:00", "10:01-12:00", "12:01-14:00", "14:01+"):
-            q = z0[z0.entry_bucket == bucket]
+            q = events[events.entry_bucket == bucket]
             if len(q):
-                summaries.append(summarize(q, f"entry={bucket}", horizon))
+                summaries.append(summarize(q, col, f"entry={bucket}", horizon))
 
     metrics = pd.DataFrame(summaries)
     metrics.to_csv(out / "btst_metrics.csv", index=False)
@@ -168,8 +167,7 @@ def main() -> None:
     yearly = []
     for year, z in events.groupby("year"):
         for h, col in (("overnight", "overnight_R"), ("nextday", "return_R")):
-            zz = z.rename(columns={col: "return_R"})
-            yearly.append(summarize(zz, f"year={year}", h))
+            yearly.append(summarize(z, col, f"year={year}", h))
     yearly_df = pd.DataFrame(yearly)
     yearly_df.to_csv(out / "btst_yearly_metrics.csv", index=False)
 
