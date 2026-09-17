@@ -8,6 +8,7 @@ on:
       - '.github/workflows/real-data-baseline.yml'
       - 'scripts/prepare_reference_nifty.py'
       - 'scripts/run_baseline.py'
+      - 'cpr_lab/data_quality.py'
   workflow_dispatch:
 
 permissions:
@@ -65,6 +66,7 @@ jobs:
           path: |
             data/reference/NIFTY50_5min_reference.csv
             data/reference/NIFTY50_5min_reference.provenance.txt
+            data/reference/NIFTY50_5min_reference.source_counts.csv
             results/reference_baseline/signals.csv
             results/reference_baseline/trades.csv
             results/reference_baseline/equity.csv
