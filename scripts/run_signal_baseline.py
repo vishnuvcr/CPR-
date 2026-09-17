@@ -17,7 +17,6 @@ WIDE_Y = 1.00
 
 
 def _pvalue_mean(values: pd.Series) -> float:
-    """Two-sided one-sample t-test against zero, without scipy dependency."""
     x = pd.to_numeric(values, errors="coerce").dropna().to_numpy(dtype=float)
     if len(x) < 2:
         return float("nan")
@@ -26,7 +25,8 @@ def _pvalue_mean(values: pd.Series) -> float:
         return 0.0 if x.mean() != 0 else 1.0
     try:
         from scipy.stats import t as student_t  # type: ignore
-        return float(2.0 * student_t.sf(abs(x.mean() / (sd / np.sqrt(len(x)))), len(x) - 1))
+        statistic = x.mean() / (sd / np.sqrt(len(x)))
+        return float(2.0 * student_t.sf(abs(statistic), len(x) - 1))
     except ImportError:
         return float("nan")
 
@@ -62,8 +62,6 @@ def main() -> None:
 
     bars = load_ohlcv_csv(a.input)
     daily = bars.resample("1D").agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}).dropna()
-    daily["day_return"] = daily.close.pct_change()
-    daily["day_range_atr"] = (daily.high - daily.low) / daily_reference_features(daily)["D_ATR20"].reindex(daily.index)
     daily_features = daily_reference_features(daily)
     x = add_intraday_daily_features(bars, daily_features)
     config = StrategyConfig(narrow_x=NARROW_X, wide_y=WIDE_Y, atr_stop=1.0, target_r=2.0, exit_time="15:15")
@@ -73,30 +71,32 @@ def main() -> None:
     for i, (ts, r) in enumerate(x.iloc[:-1].iterrows()):
         side = "LONG" if bool(signals.loc[ts, "long_entry"]) else "SHORT" if bool(signals.loc[ts, "short_entry"]) else None
         atr = r.get("D_ATR20")
-        if side is None or pd.isna(atr) or float(atr) <= 0:
+        width_ratio = r.get("D_CPR_width_ATR_ratio")
+        if side is None or pd.isna(atr) or float(atr) <= 0 or pd.isna(width_ratio):
             continue
+
         nxt = x.iloc[i + 1]
         entry = float(nxt.open)
         atr = float(atr)
+        width_ratio = float(width_ratio)
         direction = 1 if side == "LONG" else -1
         close_pnl = direction * (float(nxt.close) - entry)
         mfe = float(nxt.high) - entry if direction == 1 else entry - float(nxt.low)
         mae = float(nxt.low) - entry if direction == 1 else entry - float(nxt.high)
-        width_ratio = float(r.get("D_CPR_width_ATR_ratio")) if pd.notna(r.get("D_CPR_width_ATR_ratio")) else np.nan
         regime = "narrow" if width_ratio < NARROW_X else "wide" if width_ratio > WIDE_Y else "neutral"
         signal_type = "narrow_breakout" if regime == "narrow" else "wide_reversal" if regime == "wide" else "neutral_signal"
-        day = pd.Timestamp(ts).normalize()
-        day_close = float(r.close)
-        day_open = float(x.loc[day].open) if day in x.index.normalize() else np.nan
-        intraday_direction = "up" if day_close >= day_open else "down"
+        entry_minutes = ts.hour * 60 + ts.minute
+        entry_bucket = "09:15-10:00" if entry_minutes <= 600 else "10:01-12:00" if entry_minutes <= 720 else "12:01-14:00" if entry_minutes <= 840 else "14:01+"
         rows.append({
             "signal_time": ts,
             "entry_time": x.index[i + 1],
-            "date": pd.Timestamp(ts).date(),
+            "date": ts.date(),
+            "year": ts.year,
             "hour": ts.hour,
             "side": side,
             "signal_type": signal_type,
             "cpr_regime": regime,
+            "entry_bucket": entry_bucket,
             "width_ratio": width_ratio,
             "entry_price": entry,
             "next_close_pnl_points": close_pnl,
@@ -107,25 +107,24 @@ def main() -> None:
             "mfe_r": mfe / atr,
             "mae_r": mae / atr,
             "D_ATR20": atr,
-            "prior_day_return_pct": 100.0 * float(r.get("D_Close", np.nan)) / float(r.get("D_Close", np.nan)) - 100.0,
         })
 
     events = pd.DataFrame(rows)
     if events.empty:
         raise SystemExit("No CPR signals generated")
 
-    # Regime-independent descriptive outputs.
     events.to_csv(out / "signal_events.csv", index=False)
     signals.to_csv(out / "signals.csv")
 
-    metrics = [summarize(events, "ALL")]
-    metrics.extend(summarize(events[events.side == side], side) for side in ("LONG", "SHORT") if (events.side == side).any())
-    pd.DataFrame(metrics).to_csv(out / "signal_metrics.csv", index=False)
+    base_metrics = [summarize(events, "ALL")]
+    base_metrics.extend(summarize(events[events.side == side], side) for side in ("LONG", "SHORT") if (events.side == side).any())
+    pd.DataFrame(base_metrics).to_csv(out / "signal_metrics.csv", index=False)
 
     groupings = [
         ("cpr_regime", ["narrow", "neutral", "wide"]),
         ("signal_type", ["narrow_breakout", "neutral_signal", "wide_reversal"]),
         ("side", ["LONG", "SHORT"]),
+        ("entry_bucket", ["09:15-10:00", "10:01-12:00", "12:01-14:00", "14:01+"]),
     ]
     conditional = []
     for column, levels in groupings:
@@ -134,23 +133,12 @@ def main() -> None:
             if len(z):
                 conditional.append(summarize(z, f"{column}={level}"))
 
-    # Entry-time buckets are descriptive only; no threshold selection is performed.
-    events["entry_bucket"] = pd.cut(events["hour"], bins=[-1, 10, 12, 14, 24], labels=["09:15-10:00", "10:01-12:00", "12:01-14:00", "14:01+"])
-    for level in events.entry_bucket.dropna().unique():
-        z = events[events.entry_bucket == level]
-        conditional.append(summarize(z, f"entry_bucket={level}"))
-
-    # Calendar-year stability is retained as an audit diagnostic, not an optimization target.
-    events["year"] = pd.to_datetime(events.date).dt.year
-    yearly = []
-    for year, z in events.groupby("year"):
-        yearly.append(summarize(z, f"year={year}"))
-
+    yearly = [summarize(z, f"year={year}") for year, z in events.groupby("year")]
     pd.DataFrame(conditional).to_csv(out / "conditional_metrics.csv", index=False)
     pd.DataFrame(yearly).to_csv(out / "yearly_metrics.csv", index=False)
 
     print("=== ALL / DIRECTION ===")
-    print(pd.DataFrame(metrics).to_string(index=False))
+    print(pd.DataFrame(base_metrics).to_string(index=False))
     print("\n=== CPR REGIME / SIGNAL TYPE / ENTRY TIME ===")
     print(pd.DataFrame(conditional).to_string(index=False))
     print("\n=== YEARLY STABILITY ===")
