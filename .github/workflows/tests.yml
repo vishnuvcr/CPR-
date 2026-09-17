@@ -17,10 +17,30 @@ on:
         options:
           - unit
           - monte_carlo
+          - wfo_smoke
           - wfo
+      data_path:
+        description: "OHLCV CSV path for WFO (timestamp, open, high, low, close, volume)"
+        required: false
+        default: "data/ohlcv.csv"
+        type: string
+      risk_fraction:
+        description: "Risk fraction per trade for Monte Carlo"
+        required: false
+        default: "0.01"
+        type: string
+      monte_carlo_trades:
+        description: "Number of trades per Monte Carlo path"
+        required: false
+        default: "100"
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
   unit-tests:
+    if: github.event_name != 'workflow_dispatch' || inputs.run_mode == 'unit'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,3 +51,75 @@ jobs:
       - run: python -m pip install -e .
       - run: python -m pip install pytest
       - run: python -m pytest
+
+  monte-carlo:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_mode == 'monte_carlo'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e .
+      - name: Generate deterministic MC input
+        run: |
+          python - <<'PY'
+          import numpy as np
+          import pandas as pd
+          rng = np.random.default_rng(20260917)
+          n = 500
+          wins = rng.random(n) < 0.55
+          returns = np.where(wins, 1.5, -1.0)
+          pd.DataFrame({'return_on_risk': returns}).to_csv('mc_trades.csv', index=False)
+          PY
+      - name: Run 10000-path Monte Carlo
+        run: >-
+          python scripts/run_monte_carlo.py
+          --input mc_trades.csv
+          --column return_on_risk
+          --risk ${{ inputs.risk_fraction }}
+          --paths 10000
+          --trades ${{ inputs.monte_carlo_trades }}
+          --block-size 5
+          | tee results_monte_carlo.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpr-monte-carlo-results
+          path: results_monte_carlo.txt
+
+  wfo-smoke:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_mode == 'wfo_smoke'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e .
+      - name: Generate deterministic synthetic 5-minute OHLCV
+        run: python scripts/generate_synthetic_ohlcv.py --days 520 --output data/wfo_smoke.csv
+      - name: Run WFO smoke test
+        run: python scripts/run_wfo.py --input data/wfo_smoke.csv --format csv --output wfo_smoke.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpr-wfo-smoke-results
+          path: wfo_smoke.csv
+
+  wfo:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_mode == 'wfo'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e .
+      - name: Validate WFO input
+        run: |
+          test -f "${{ inputs.data_path }}" || { echo "Missing WFO data: ${{ inputs.data_path }}"; exit 2; }
+      - name: Run 252/63/63 walk-forward analysis
+        run: python scripts/run_wfo.py --input "${{ inputs.data_path }}" --format csv --output wfo_results.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpr-wfo-results
+          path: wfo_results.csv
