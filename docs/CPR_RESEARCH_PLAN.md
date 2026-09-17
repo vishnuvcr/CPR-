@@ -22,9 +22,9 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 0 | Data integrity, provenance, reproducibility | COMPLETE | Canonical data validates; reproducibility smoke passes |
 | 1A | Unconditional intraday CPR signal edge | COMPLETE | 4,281 signals characterized; unconditional next-bar edge assessed |
 | 1B | Conditional intraday edge by CPR regime, signal type, direction, time, year | COMPLETE — WIDTH DIAGNOSTICS REVIEWED | Width distribution reviewed; fixed-regime comparison not available because generated signals remain narrow |
-| 1C | Intraday multi-horizon outcomes (1/3/6/12 bars, EOD), MFE/MAE | IN PROGRESS | Determine whether any conditional edge persists beyond one bar |
-| 1D | Intraday event/trade lifecycle with stops, targets and time exits, excluding costs | PLANNED | Compare signal edge with executable trade distributions |
-| 2A | BTST signal characterization | PLANNED | Close-to-next-open and next-day OHLC distributions by CPR regime |
+| 1C | Intraday multi-horizon outcomes (1/3/6/12 bars, EOD), MFE/MAE | COMPLETE — NO STABLE INTRADAY EDGE ESTABLISHED | Pre-specified horizons characterized without evidence of a statistically reliable overall effect |
+| 1D | Intraday event/trade lifecycle with stops, targets and time exits, excluding costs | DEFERRED | Revisit only if later evidence provides a justified intraday hypothesis |
+| 2A | BTST signal characterization | IN PROGRESS | Close-to-next-open and next-day OHLC distributions by CPR regime |
 | 2B | BTST executable lifecycle and realistic costs | PLANNED | Out-of-sample cost-aware results |
 | 3A | Swing horizons (2/3/5/10 sessions) | PLANNED | Horizon-dependent CPR effect characterized |
 | 3B | Swing executable lifecycle and costs | PLANNED | Out-of-sample cost-aware results |
@@ -34,18 +34,16 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 7 | Final walk-forward / untouched holdout | PLANNED | No material degradation on unseen data |
 | 8 | Paper-trading signal pipeline | PLANNED | Reproducible live signal generation with explicit execution rules |
 
-## Current step: Phase 1C — multi-horizon intraday persistence
+## Current step: Phase 2A — BTST signal characterization
 
-Phase 1B is closed as a diagnostic phase. The full daily CPR-width distribution showed that neutral/wide CPR days exist, but the current directional signal definition generates only narrow-regime signals. Exploratory width deciles showed no statistically convincing monotonic relationship with next-bar outcome. The research therefore moves to a pre-specified horizon test rather than optimizing width thresholds.
+Phase 1C tested the unchanged bias-safe CPR directional signal from next-bar open across 1, 3, 6 and 12 five-minute bars plus same-session EOD. The aggregate results did not establish a statistically reliable intraday effect, so the research now tests whether the information content is expressed across the session boundary instead.
 
-Phase 1C measures the same bias-safe CPR signal from next-bar open across 1, 3, 6 and 12 five-minute bars, plus same-session EOD. Each horizon is session-bounded so an intraday measurement cannot silently become an overnight/BTST test. Outcomes include R-normalized return, win rate, MFE, MAE, quartiles, p-values, direction, entry-time bucket, regime, and yearly stability.
-
-These horizon measurements are descriptive discovery tests. No horizon, width bin, stop, target, or threshold will be selected because it produces the most favorable historical result.
+Phase 2A measures two pre-specified quantities without costs: (1) source-session close to next-session open, representing the overnight/BTST gap; and (2) next-session open to next-session close, representing a one-session hold. Next-session high/low are used for MFE/MAE. Results are reported by direction, fixed CPR regime, signal-time bucket, and year. No width bin, holding rule, stop, target, or threshold is selected from historical profitability.
 
 ## Decision gates
 
-- If no conditional separation is found: proceed to BTST and swing characterization rather than forcing an intraday strategy.
-- If conditional separation is found: test the effect across additional horizons before any optimization.
+- If BTST characterization shows no meaningful and stable separation: proceed to swing characterization.
+- If a BTST effect appears: test its stability across years/subperiods before designing an executable BTST strategy.
 - Any promising subgroup must survive chronological out-of-sample testing and realistic costs.
 - A positive backtest alone is not sufficient for promotion; reproducibility and robustness are required.
 
@@ -58,4 +56,6 @@ These horizon measurements are descriptive discovery tests. No horizon, width bi
 - 2026-09-17: Phase 1B conditional decomposition implemented and CI-validated on commit 7332948fe41a34076202279b3fa0591e6c1eda58.
 - 2026-09-17: Phase 1B result reviewed: all 4,281 signals were classified as narrow; fixed 0.50/1.00 ATR thresholds did not produce neutral/wide signal groups. Width-coverage and exploratory decile diagnostics added in commit 8226132a6d5e195013f8b67f2a842d8bc4783526.
 - 2026-09-17: Width diagnostic completed: daily CPR population contained 2,207 narrow, 44 neutral, and 2 wide days; width-vs-next-bar outcome Spearman rho was approximately -0.010 with p approximately 0.50. No width threshold was optimized.
-- 2026-09-17: Phase 1C multi-horizon diagnostic implementation added; horizons are explicitly session-bounded. CI workflow added for reproducible execution.
+- 2026-09-17: Phase 1C multi-horizon diagnostic implementation and CI workflow added.
+- 2026-09-17: Phase 1C completed successfully on the pinned reference dataset; aggregate 1/3/6/12-bar and EOD outcomes did not establish a statistically reliable intraday effect. Phase 1D was therefore deferred rather than forcing stop/target optimization.
+- 2026-09-18: Phase 2A BTST characterization implementation and CI workflow added; analysis is cost-free and uses the same fixed signal definition.
