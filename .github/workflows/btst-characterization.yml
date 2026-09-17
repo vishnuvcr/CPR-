@@ -33,18 +33,32 @@ jobs:
         run: |
           rm -rf artifacts/btst
           python scripts/run_btst_characterization.py --input data/canonical/nifty50_5m.csv --output-dir artifacts/btst
-      - name: Validate Phase 2A artifacts
+      - name: Validate Phase 2A artifacts and timing integrity
         run: |
           test -s artifacts/btst/btst_events.csv
           test -s artifacts/btst/btst_metrics.csv
           test -s artifacts/btst/btst_yearly_metrics.csv
           python - <<'PY'
           import pandas as pd
+
           m = pd.read_csv('artifacts/btst/btst_metrics.csv')
           all_rows = m[m.group == 'ALL']
-          assert set(['overnight','nextday']) == set(all_rows.horizon)
+          assert set(['overnight', 'nextday']) == set(all_rows.horizon)
           assert (all_rows.signals > 0).all()
-          print(m[m.group.isin(['ALL','LONG','SHORT'])].to_string(index=False))
+
+          events = pd.read_csv('artifacts/btst/btst_events.csv', parse_dates=['signal_time', 'signal_date', 'next_session'])
+          assert events['signal_date'].nunique() == len(events), 'BTST must have at most one end-of-session signal per source day'
+          assert (events['next_session'].dt.date > events['signal_date'].dt.date).all()
+
+          canonical = pd.read_csv('data/canonical/nifty50_5m.csv', parse_dates=['timestamp'])
+          canonical['session_date'] = canonical['timestamp'].dt.date
+          final_times = canonical.groupby('session_date')['timestamp'].max()
+          event_dates = events['signal_date'].dt.date
+          for _, row in events.iterrows():
+              assert row['signal_time'] == final_times.loc[row['signal_date'].date()], 'Signal is not from final completed bar'
+
+          print('Timing integrity: PASS — every BTST event uses the final completed bar of its source session.')
+          print(m[m.group.isin(['ALL', 'LONG', 'SHORT'])].to_string(index=False))
           PY
       - name: Upload Phase 2A artifacts
         uses: actions/upload-artifact@v4
