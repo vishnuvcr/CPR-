@@ -51,10 +51,14 @@ jobs:
           assert set(s.selected_horizon).issubset({'2session','3session','5session','10session'})
           assert len(o)>0
           assert set(c.strategy)=={'SELECTED','2session','3session','5session','10session'}
-          assert (s.train_end < s.validation_start).all()
-          assert (s.validation_end < s.validation_start.shift(-1)).dropna().all()
-          assert (s.purge_start > s.train_end).all()
+          assert (s.train_end < s.purge_start).all()
           assert (s.purge_start < s.validation_start).all()
+          intervals=s[['split','train_end','purge_start','validation_start','validation_end']].drop_duplicates().sort_values('split')
+          assert (intervals.train_end < intervals.purge_start).all()
+          assert (intervals.purge_start < intervals.validation_start).all()
+          assert (intervals.validation_start <= intervals.validation_end).all()
+          if len(intervals)>1:
+              assert (intervals.validation_end.iloc[:-1].to_numpy() < intervals.validation_start.iloc[1:].to_numpy()).all()
           assert (o.entry_session <= o.target_session).all()
           print('Phase 4 validation: PASS')
           print(c.to_string(index=False))
