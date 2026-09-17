@@ -1,8 +1,4 @@
-"""Signal engines for CPR hypothesis testing.
-
-These functions emit event columns; execution, fill rules, costs and sizing stay outside
-signal generation so hypotheses remain independently testable.
-"""
+"""Signal engines for CPR hypothesis testing."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,7 +32,6 @@ def intraday_directional_signals(df: pd.DataFrame, cfg: StrategyConfig) -> pd.Da
     missing = [c for c in required if c not in x]
     if missing:
         raise ValueError(f"Missing strategy columns: {missing}")
-
     x["regime"] = regime(x["D_CPR_width_ATR_ratio"], cfg.narrow_x, cfg.wide_y)
     x["upper_trigger"] = x[["D_R1", "D_PDH"]].max(axis=1)
     x["lower_trigger"] = x[["D_S1", "D_PDL"]].min(axis=1)
@@ -70,20 +65,14 @@ def confluence_reversal_signals(df: pd.DataFrame) -> pd.DataFrame:
 
 class VirginCPRTracker:
     """Online first-touch state machine for verified virgin CPR zones."""
-
     def __init__(self) -> None:
         self.active: list[dict[str, object]] = []
 
     def add_zone(self, source_day: pd.Timestamp, lower: float, upper: float) -> None:
-        self.active.append({
-            "source_day": pd.Timestamp(source_day),
-            "lower": float(min(lower, upper)),
-            "upper": float(max(lower, upper)),
-        })
+        self.active.append({"source_day": pd.Timestamp(source_day), "lower": float(min(lower, upper)), "upper": float(max(lower, upper))})
 
     def update_bar(self, ts: pd.Timestamp, low: float, high: float) -> list[dict[str, object]]:
-        hits = []
-        still_active = []
+        hits, still_active = [], []
         for zone in self.active:
             touched = float(high) >= float(zone["lower"]) and float(low) <= float(zone["upper"])
             if touched:
@@ -95,10 +84,11 @@ class VirginCPRTracker:
 
 
 def virgin_cpr_candidates(daily: pd.DataFrame) -> pd.DataFrame:
-    """Return only CPRs that were untouched during their own source session.
+    """Identify CPRs whose *immediately following session* never touched the zone.
 
-    A CPR is virgin only when the completed source day's range does not intersect
-    its own CPR zone. These zones become eligible for future first-touch tracking.
+    The source day's own range necessarily contains its CPR. Therefore virgin status
+    is determined by the next completed session. A verified zone becomes eligible
+    from the session after that validation session.
     """
     required = {"high", "low", "close"}
     if not required.issubset(daily.columns):
@@ -107,38 +97,33 @@ def virgin_cpr_candidates(daily: pd.DataFrame) -> pd.DataFrame:
 
     x = daily.sort_index()
     rows = []
-    for ts, row in x.iterrows():
-        c = cpr_levels(float(row.high), float(row.low), float(row.close))
-        untouched = float(row.high) < c.lower or float(row.low) > c.upper
-        if untouched:
-            rows.append({"source_day": ts, "CPR_low": c.lower, "CPR_high": c.upper})
-    return pd.DataFrame(rows).set_index("source_day") if rows else pd.DataFrame(columns=["CPR_low", "CPR_high"], index=pd.DatetimeIndex([], name=x.index.name))
+    for i in range(len(x) - 1):
+        source_day = x.index[i]
+        validation_day = x.index[i + 1]
+        source = x.iloc[i]
+        validation = x.iloc[i + 1]
+        c = cpr_levels(float(source.high), float(source.low), float(source.close))
+        untouched_next_day = float(validation.high) < c.lower or float(validation.low) > c.upper
+        if untouched_next_day:
+            rows.append({"source_day": source_day, "validation_day": validation_day, "eligible_from": validation_day, "CPR_low": c.lower, "CPR_high": c.upper})
+    return pd.DataFrame(rows).set_index("source_day") if rows else pd.DataFrame(columns=["validation_day", "eligible_from", "CPR_low", "CPR_high"], index=pd.DatetimeIndex([], name=x.index.name))
 
 
 def vcp_r_first_touch_events(intraday: pd.DataFrame, virgin_zones: pd.DataFrame) -> pd.DataFrame:
-    """Generate first future touch for previously verified virgin CPR zones."""
+    """Generate the first touch strictly after the validation session."""
     x = intraday.copy().sort_index()
     d = virgin_zones.copy().sort_index()
     tracker = VirginCPRTracker()
     out = []
-    added = set()
+    pending = d.reset_index().sort_values("eligible_from").to_dict("records")
+    p = 0
     for ts, row in x.iterrows():
-        day = pd.Timestamp(ts).normalize()
-        # A source day's CPR can only become active after that source session ends.
-        for source_day in d.index:
-            source = pd.Timestamp(source_day).normalize()
-            if source >= day or source in added:
-                continue
-            z = d.loc[source_day]
-            tracker.add_zone(source, float(z.CPR_low), float(z.CPR_high))
-            added.add(source)
+        while p < len(pending) and pd.Timestamp(pending[p]["eligible_from"]).normalize() < pd.Timestamp(ts).normalize():
+            z = pending[p]
+            tracker.add_zone(pd.Timestamp(z["source_day"]), float(z["CPR_low"]), float(z["CPR_high"]))
+            p += 1
         for hit in tracker.update_bar(ts, float(row.low), float(row.high)):
-            out.append({
-                "timestamp": ts,
-                "source_day": hit["source_day"],
-                "zone_low": hit["lower"],
-                "zone_high": hit["upper"],
-            })
+            out.append({"timestamp": ts, "source_day": hit["source_day"], "zone_low": hit["lower"], "zone_high": hit["upper"]})
     return pd.DataFrame(out).set_index("timestamp") if out else pd.DataFrame(columns=["source_day", "zone_low", "zone_high"], index=pd.DatetimeIndex([], name=x.index.name))
 
 
