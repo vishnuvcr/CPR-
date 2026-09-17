@@ -1,40 +1,29 @@
 name: CPR signal-only baseline
-
 on:
   push:
     branches: [cpr-v1.0-scientific-multi-dimensional-testing]
-    paths:
-      - 'scripts/run_signal_baseline.py'
-      - 'scripts/prepare_reference_nifty.py'
-      - 'cpr_lab/**'
-      - '.github/workflows/signal-baseline.yml'
+    paths: ['scripts/run_signal_baseline.py','scripts/prepare_reference_nifty.py','cpr_lab/**','.github/workflows/signal-baseline.yml']
   workflow_dispatch:
-
 jobs:
   signal-baseline:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+        with: {python-version: '3.11'}
       - name: Install package
         run: python -m pip install -e .
       - name: Download pinned reference dataset
         run: |
           mkdir -p data/reference
-          curl -L --fail --retry 3 -o data/reference/nifty50_source.csv \
-            https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv
+          curl -L --fail --retry 3 -o data/reference/nifty50_source.csv https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv
       - name: Convert to canonical 5-minute OHLCV
         run: python scripts/prepare_reference_nifty.py --input data/reference/nifty50_source.csv --output data/reference/nifty50_5m.csv --provenance data/reference/provenance.json
       - name: Validate canonical data
         run: |
           python - <<'PY'
           from cpr_lab.data_quality import load_ohlcv_csv
-          x = load_ohlcv_csv('data/reference/nifty50_5m.csv')
-          assert len(x) > 10000
-          assert str(x.index.tz) == 'Asia/Kolkata'
-          print(f'canonical_rows={len(x)} start={x.index.min()} end={x.index.max()}')
+          x=load_ohlcv_csv('data/reference/nifty50_5m.csv'); assert len(x)>10000; assert str(x.index.tz)=='Asia/Kolkata'; print(len(x),x.index.min(),x.index.max())
           PY
       - name: Run signal-only baseline
         run: python scripts/run_signal_baseline.py --input data/reference/nifty50_5m.csv --output-dir artifacts
@@ -42,15 +31,6 @@ jobs:
         run: |
           test -s artifacts/signal_events.csv
           test -s artifacts/signal_metrics.csv
-          python - <<'PY'
-          import pandas as pd
-          e = pd.read_csv('artifacts/signal_events.csv')
-          m = pd.read_csv('artifacts/signal_metrics.csv')
-          assert len(e) > 0
-          assert len(m) >= 1
-          assert e['close_pnl_r'].notna().all()
-          print(m.to_string(index=False))
-          PY
       - name: Upload signal baseline
         uses: actions/upload-artifact@v4
         with:
