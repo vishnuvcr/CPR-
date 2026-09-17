@@ -24,7 +24,7 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 1B | Conditional intraday edge by CPR regime, signal type, direction, time, year | COMPLETE — WIDTH DIAGNOSTICS REVIEWED | Width distribution reviewed; fixed-regime comparison not available because generated signals remain narrow |
 | 1C | Intraday multi-horizon outcomes (1/3/6/12 bars, EOD), MFE/MAE | COMPLETE — NO STABLE INTRADAY EDGE ESTABLISHED | Pre-specified horizons characterized without evidence of a statistically reliable overall effect |
 | 1D | Intraday event/trade lifecycle with stops, targets and time exits, excluding costs | DEFERRED | Revisit only if later evidence provides a justified intraday hypothesis |
-| 2A | BTST signal characterization | IN PROGRESS | Close-to-next-open and next-day OHLC distributions by CPR regime |
+| 2A | BTST signal characterization | IN PROGRESS — LOOK-AHEAD CORRECTION APPLIED | Bias-safe end-of-session signal; close-to-next-open and next-day OHLC distributions by CPR regime |
 | 2B | BTST executable lifecycle and realistic costs | PLANNED | Out-of-sample cost-aware results |
 | 3A | Swing horizons (2/3/5/10 sessions) | PLANNED | Horizon-dependent CPR effect characterized |
 | 3B | Swing executable lifecycle and costs | PLANNED | Out-of-sample cost-aware results |
@@ -38,7 +38,7 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 
 Phase 1C tested the unchanged bias-safe CPR directional signal from next-bar open across 1, 3, 6 and 12 five-minute bars plus same-session EOD. The aggregate results did not establish a statistically reliable intraday effect, so the research now tests whether the information content is expressed across the session boundary instead.
 
-Phase 2A measures two pre-specified quantities without costs: (1) source-session close to next-session open, representing the overnight/BTST gap; and (2) next-session open to next-session close, representing a one-session hold. Next-session high/low are used for MFE/MAE. Results are reported by direction, fixed CPR regime, signal-time bucket, and year. No width bin, holding rule, stop, target, or threshold is selected from historical profitability.
+Phase 2A measures two pre-specified quantities without costs: (1) source-session close to next-session open, representing the overnight/BTST gap; and (2) next-session open to next-session close, representing a one-session hold. Next-session high/low are used for MFE/MAE. BTST eligibility is restricted to the final completed bar of each source session, so the signal cannot use the later same-day close. The next session open is the executable entry. Results are reported by direction, fixed CPR regime, signal-time bucket, and year. No width bin, holding rule, stop, target, or threshold is selected from historical profitability.
 
 ## Decision gates
 
@@ -58,4 +58,6 @@ Phase 2A measures two pre-specified quantities without costs: (1) source-session
 - 2026-09-17: Width diagnostic completed: daily CPR population contained 2,207 narrow, 44 neutral, and 2 wide days; width-vs-next-bar outcome Spearman rho was approximately -0.010 with p approximately 0.50. No width threshold was optimized.
 - 2026-09-17: Phase 1C multi-horizon diagnostic implementation and CI workflow added.
 - 2026-09-17: Phase 1C completed successfully on the pinned reference dataset; aggregate 1/3/6/12-bar and EOD outcomes did not establish a statistically reliable intraday effect. Phase 1D was therefore deferred rather than forcing stop/target optimization.
-- 2026-09-18: Phase 2A BTST characterization implementation and CI workflow added; analysis is cost-free and uses the same fixed signal definition.
+- 2026-09-18: Phase 2A BTST characterization implementation and CI workflow added.
+- 2026-09-18: BTST workflow initially failed during canonicalization because an unsupported --source-counts-output argument was passed; the workflow was corrected.
+- 2026-09-18: BTST characterization was audited for temporal leakage. The original implementation used the full source-session close for intraday signals generated before that close. BTST logic was corrected to use only the final completed source-session bar and the next-session open as the executable entry. CI now explicitly validates one end-of-session event per source day and final-bar timing.
