@@ -1,0 +1,86 @@
+name: CPR Phase 4C selector robustness
+
+on:
+  push:
+    branches: [cpr-v1.0-scientific-multi-dimensional-testing]
+    paths:
+      - 'scripts/run_phase4c_selector_robustness.py'
+      - 'scripts/run_cross_horizon_selector.py'
+      - 'scripts/run_swing_characterization.py'
+      - 'scripts/prepare_reference_nifty.py'
+      - 'cpr_lab/**'
+      - 'tests/test_phase4c_selector_robustness.py'
+      - 'docs/CPR_RESEARCH_PLAN.md'
+      - '.github/workflows/phase4c-selector-robustness.yml'
+  workflow_dispatch:
+
+jobs:
+  robustness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package
+        run: pip install -e '.[dev]'
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Run Phase 4C unit tests
+        run: python -m pytest -q tests/test_phase4c_selector_robustness.py
+      - name: Download pinned reference dataset
+        run: |
+          mkdir -p data/raw data/canonical artifacts/swing artifacts/cross-horizon artifacts/phase4c
+          curl -L --fail --retry 3 -o data/raw/nifty50_candlestick_data.csv \
+            https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv
+      - name: Convert to canonical 5-minute OHLCV
+        run: python scripts/prepare_reference_nifty.py --input data/raw/nifty50_candlestick_data.csv --output data/canonical/nifty50_5m.csv
+      - name: Validate canonical data
+        run: python -m cpr_lab.data_quality data/canonical/nifty50_5m.csv
+      - name: Recreate Phase 3A swing artifact
+        run: python scripts/run_swing_characterization.py --input data/canonical/nifty50_5m.csv --output-dir artifacts/swing
+      - name: Recreate corrected Phase 4 selector artifact
+        run: python scripts/run_cross_horizon_selector.py --input artifacts/swing/swing_events.csv --output-dir artifacts/cross-horizon
+      - name: Run Phase 4C robustness/placebo tests
+        run: |
+          python scripts/run_phase4c_selector_robustness.py \
+            --selected artifacts/cross-horizon/cross_horizon_selected_events.csv \
+            --events artifacts/swing/swing_events.csv \
+            --selections artifacts/cross-horizon/cross_horizon_selections.csv \
+            --output-dir artifacts/phase4c \
+            --simulations 5000
+      - name: Validate Phase 4C outputs
+        run: |
+          test -s artifacts/phase4c/phase4c_temporal_placebo.csv
+          test -s artifacts/phase4c/phase4c_temporal_placebo_distribution.csv
+          test -s artifacts/phase4c/phase4c_split_stability.csv
+          test -s artifacts/phase4c/phase4c_fixed_horizon_reference.csv
+          test -s artifacts/phase4c/phase4c_lagged_selection.csv
+          test -s artifacts/phase4c/phase4c_direction_bucket.csv
+          python - <<'PY'
+          import pandas as pd
+          p=pd.read_csv('artifacts/phase4c/phase4c_temporal_placebo.csv')
+          d=pd.read_csv('artifacts/phase4c/phase4c_temporal_placebo_distribution.csv')
+          s=pd.read_csv('artifacts/phase4c/phase4c_split_stability.csv')
+          f=pd.read_csv('artifacts/phase4c/phase4c_fixed_horizon_reference.csv')
+          l=pd.read_csv('artifacts/phase4c/phase4c_lagged_selection.csv')
+          g=pd.read_csv('artifacts/phase4c/phase4c_direction_bucket.csv')
+          assert len(p)==1 and len(d)==5000
+          assert len(s)>=2
+          assert set(f.horizon)=={'2session','3session','5session','10session'}
+          assert len(l)==1 and len(g)>0
+          assert p.empirical_two_sided_p.between(0,1).all()
+          assert p.actual_selected_mean_R.notna().all()
+          print('Phase 4C validation: PASS — temporal placebo, chronological stability, lagged selector, and subgroup outputs present')
+          print(p.to_string(index=False))
+          print(s.to_string(index=False))
+          print(f.to_string(index=False))
+          print(l.to_string(index=False))
+          print(g.to_string(index=False))
+          PY
+      - name: Upload Phase 4C artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpr-phase4c-selector-robustness
+          path: artifacts/phase4c/
+          retention-days: 90
