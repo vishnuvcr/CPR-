@@ -46,20 +46,34 @@ def prepare(input_path: Path, output_path: Path) -> None:
 
     # Regular NSE cash session. We do not fabricate missing source minutes.
     x = x.between_time("09:15", "15:29")
+    if x.empty:
+        raise ValueError("No source observations remain after NSE session filtering")
     x["volume"] = 0.0  # NIFTY spot index has no traded volume.
 
-    # Anchor 5-minute bins to the NSE session start. Preserve every bin that has
-    # source observations; no OHLC values are forward-filled or invented.
-    rule = "5min"
-    kwargs = {"origin": "start_day", "offset": "15min", "label": "left", "closed": "left"}
-    bars = x.resample(rule, **kwargs).agg(
-        {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
-    ).dropna()
-    counts = x["close"].resample(rule, **kwargs).count().reindex(bars.index)
+    # Avoid pandas resample origin/offset behaviour differences across pandas
+    # versions. Build the bucket explicitly from each timestamp's 5-minute floor.
+    # The session filter above guarantees that only 09:15-15:29 observations are
+    # included, so each bucket is naturally aligned to 09:15, 09:20, ..., 15:25.
+    bucket = x.index.floor("5min")
+    bars = x.groupby(bucket, sort=True).agg(
+        open=("open", "first"),
+        high=("high", "max"),
+        low=("low", "min"),
+        close=("close", "last"),
+        volume=("volume", "sum"),
+    )
+    bars.index.name = "timestamp"
+
+    counts = x["close"].groupby(bucket, sort=True).count().astype("int64")
+    counts.index.name = "timestamp"
+
+    if bars.empty:
+        raise ValueError("5-minute aggregation produced zero bars")
+    if bars.isna().any().any():
+        raise ValueError("5-minute aggregation produced NaN OHLCV values")
 
     # Keep a machine-readable completeness audit alongside the canonical data.
-    audit = pd.DataFrame({"source_minute_count": counts.astype("int64")}, index=bars.index)
-    audit.index.name = "timestamp"
+    audit = pd.DataFrame({"source_minute_count": counts}, index=bars.index)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     bars.to_csv(output_path, index_label="timestamp")
@@ -76,6 +90,7 @@ def prepare(input_path: Path, output_path: Path) -> None:
         "derived_frequency=5-minute\n"
         "volume=0 because spot index has no traded volume\n"
         "session=09:15-15:30 Asia/Kolkata\n"
+        f"source_session_rows={len(x)}\n"
         f"five_minute_bins={len(bars)}\n"
         f"complete_5_minute_bins={int((counts == 5).sum())}\n"
         f"complete_5_minute_fraction={complete_fraction:.6f}\n"
@@ -86,6 +101,8 @@ def prepare(input_path: Path, output_path: Path) -> None:
         encoding="utf-8",
     )
     print(f"source_rows={len(raw)}")
+    print(f"session_source_rows={len(x)}")
+    print(f"unique_sessions={x.index.normalize().nunique()}")
     print(f"five_minute_rows={len(bars)}")
     print(f"complete_5_minute_fraction={complete_fraction:.6f}")
     print(f"min_source_minutes_per_bin={int(counts.min()) if len(counts) else 0}")
