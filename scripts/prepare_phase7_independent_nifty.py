@@ -34,13 +34,23 @@ def main():
     if not dup_rows.empty:
         nunique=dup_rows.groupby(level=0)[["open","high","low","close","volume"]].nunique()
         conflict_groups=int((nunique.max(axis=1)>1).sum())
-    exact_duplicate_rows=dups if not dup_rows.empty else 0
+    exact_duplicate_rows=0
+    conflicting_rows_excluded=0
     print(f"source_duplicate_timestamp_rows={dups}")
     print(f"source_conflicting_duplicate_timestamp_groups={conflict_groups}")
     if conflict_groups:
-        raise ValueError(f"Conflicting duplicate timestamps in independent source: {conflict_groups} groups")
+        nunique=dup_rows.groupby(level=0)[["open","high","low","close","volume"]].nunique()
+        conflict_index=nunique.index[nunique.max(axis=1)>1]
+        # Never choose between conflicting observations. Exclude the entire
+        # conflicting timestamp group and record it as source-data exclusion.
+        conflict_mask=x.index.isin(conflict_index)
+        conflicting_rows_excluded=int(conflict_mask.sum())
+        print(f"conflicting_duplicate_rows_excluded={conflicting_rows_excluded}")
+        x=x.loc[~conflict_mask].copy()
     if dups:
+        before=len(x)
         x=x[~x.index.duplicated(keep="first")].copy()
+        exact_duplicate_rows=int(before-len(x))
     x=x.sort_index().between_time("09:15","15:29")
     bad=((x.high<x.low)|(x.open>x.high)|(x.open<x.low)|(x.close>x.high)|(x.close<x.low)|x[["open","high","low","close"]].isna().any(axis=1))
     print(f"source_invalid_or_missing_ohlc={int(bad.sum())}")
@@ -77,7 +87,10 @@ def main():
         f"replication_start={REPLICATION_START}",
         f"source_rows={len(raw)}",
         f"source_sessions={x.index.normalize().nunique()}",
-        f"source_duplicate_timestamp_rows_excluded={exact_duplicate_rows}",
+        f"source_duplicate_timestamp_rows_detected={dups}",
+        f"source_exact_duplicate_timestamp_rows_excluded={exact_duplicate_rows}",
+        f"source_conflicting_duplicate_timestamp_groups={conflict_groups}",
+        f"source_conflicting_duplicate_timestamp_rows_excluded={conflicting_rows_excluded}",
         f"source_conflicting_duplicate_timestamp_groups={conflict_groups}",
         f"source_invalid_or_missing_ohlc_excluded={int(bad.sum())}",
         f"source_start={x.index.min()}",
