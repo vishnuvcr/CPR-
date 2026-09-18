@@ -40,7 +40,22 @@ jobs:
         run: |
           curl -L --fail --retry 3 "https://raw.githubusercontent.com/ganeshbiyer/Nse_Historical_Data/0cf3c94ecc5cfd87cc1823c17f3b2cf63d80f8e9/NIFTY50-INDEX.parquet" -o data/phase7/NIFTY50-INDEX.parquet
       - name: Prepare independent 5-minute data
-        run: python scripts/prepare_phase7_independent_nifty.py --input data/phase7/NIFTY50-INDEX.parquet --output data/phase7/independent_5m.csv
+        continue-on-error: true
+        run: |
+          set +e
+          python scripts/prepare_phase7_independent_nifty.py --input data/phase7/NIFTY50-INDEX.parquet --output data/phase7/independent_5m.csv > data/phase7/prepare.log 2>&1
+          echo $? > data/phase7/prepare.exit
+      - name: Diagnose preparation
+        if: always()
+        run: |
+          echo "=== PREP LOG ==="
+          cat data/phase7/prepare.log || true
+          echo "=== FILES ==="
+          ls -lah data/phase7 || true
+          echo "=== EXIT ==="
+          cat data/phase7/prepare.exit || true
+      - name: Require successful preparation
+        run: test "$(cat data/phase7/prepare.exit)" = "0"
       - name: Run frozen replication
         run: python scripts/run_phase7_independent_replication.py --input data/phase7/independent_5m.csv --frontier artifacts/phase5a/regime_discovery_train_pareto.csv --output-dir artifacts/phase7
       - name: Publish Phase 7 summary
@@ -59,6 +74,12 @@ jobs:
           for _,r in df.iterrows():
               print(f"| {int(r.candidate_id)} | {r.horizon} | {r.side} | {int(r.signals)} | {r.mean_R:.4f} | [{r.ci95_low:.4f}, {r.ci95_high:.4f}] | {r.sensitivity:.3f} | {r.specificity:.3f} | {r.youden_J:.3f} | {r.positive_year_fraction:.3f} |")
           PY
+      - name: Upload Phase 7 diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpr-phase7-diagnostics
+          path: data/phase7/prepare.log
       - name: Upload Phase 7 artifacts
         uses: actions/upload-artifact@v4
         with:
