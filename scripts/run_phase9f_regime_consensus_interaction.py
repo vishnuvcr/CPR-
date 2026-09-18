@@ -165,6 +165,7 @@ def add_consensus(events, frontier):
             st = state(ln, sn)
             gg = g.copy()
             gg["long_n"] = ln; gg["short_n"] = sn; gg["consensus_state"] = st
+            gg["outcome_positive"] = gg["return_R"] > 0
             gg["dataset"] = dataset
             rows.append(gg)
     return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
