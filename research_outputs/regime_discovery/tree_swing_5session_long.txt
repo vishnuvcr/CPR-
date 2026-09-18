@@ -1,8 +1,8 @@
 |--- atr_pct <= 0.010
 |   |--- close_vs_pdh_atr <= 0.064
-|   |   |--- prior_day_return_atr <= 0.301
+|   |   |--- prior_day_return_atr <= 0.300
 |   |   |   |--- class: 1
-|   |   |--- prior_day_return_atr >  0.301
+|   |   |--- prior_day_return_atr >  0.300
 |   |   |   |--- class: 1
 |   |--- close_vs_pdh_atr >  0.064
 |   |   |--- class: 1

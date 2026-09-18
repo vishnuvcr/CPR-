@@ -1,4 +1,4 @@
-|--- prior_day_return_atr <= 0.588
+|--- prior_day_return_atr <= 0.584
 |   |--- prior_day_range_atr <= 0.740
 |   |   |--- close_vs_pdl_atr <= 0.704
 |   |   |   |--- class: 1
@@ -9,7 +9,7 @@
 |   |   |   |--- class: 1
 |   |   |--- atr_pct >  0.009
 |   |   |   |--- class: 1
-|--- prior_day_return_atr >  0.588
+|--- prior_day_return_atr >  0.584
 |   |--- gap_atr <= 0.289
 |   |   |--- class: 0
 |   |--- gap_atr >  0.289

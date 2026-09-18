@@ -1,9 +1,9 @@
-|--- prior_day_return_atr <= -0.421
-|   |--- prior_day_return_atr <= -0.724
+|--- prior_day_return_atr <= -0.423
+|   |--- prior_day_return_atr <= -0.729
 |   |   |--- class: 0
-|   |--- prior_day_return_atr >  -0.724
+|   |--- prior_day_return_atr >  -0.729
 |   |   |--- class: 0
-|--- prior_day_return_atr >  -0.421
+|--- prior_day_return_atr >  -0.423
 |   |--- prior_day_range_atr <= 0.719
 |   |   |--- close_vs_cpr_mid_atr <= -0.329
 |   |   |   |--- class: 0
