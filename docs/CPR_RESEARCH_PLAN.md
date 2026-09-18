@@ -32,11 +32,11 @@ Scientifically evaluate whether Central Pivot Range (CPR)-derived signals contai
 | 4B | Selector null/stability stress test | COMPLETE — SELECTOR ADVANTAGE NOT VALIDATED | 5,000 random-horizon null simulations, paired block bootstrap, concentration, and reproducibility completed; observed advantage did not reach a strong empirical significance threshold and all paired CIs crossed zero |
 | 4C | Selector robustness / temporal placebo / stale-selector tests | COMPLETE — SELECTOR ROBUSTNESS NOT VALIDATED | Temporal placebo, chronological split stability, lagged-selection diagnostic, fixed-horizon reference, and subgroup decomposition completed; no evidence of incremental selector value |
 | 5 | ML model as regime/horizon selector | PLANNED — GATED BY 4C | Only proceed if selector survives robustness/placebo testing and has a clearly defined incremental hypothesis |
-| 6 | Robustness: subperiods, volatility regimes, direction, perturbation, Monte Carlo | PLANNED | Edge survives reasonable robustness tests |
+| 6 | Robustness: subperiods, volatility regimes, direction, perturbation, Monte Carlo | IN PROGRESS | Baseline swing effects must survive dependence-aware uncertainty, fixed chronological eras, volatility partitions, directional decomposition, and symmetric threshold perturbations |
 | 7 | Final walk-forward / untouched holdout | PLANNED | No material degradation on unseen data |
 | 8 | Paper-trading signal pipeline | PLANNED | Reproducible live signal generation with explicit execution rules |
 
-## Current step: Phase 4C — Selector robustness / temporal placebo testing
+## Current step: Phase 6 — Robustness / falsification
 
 Phase 4B has been completed. The uploaded Phase 4B artifact contained 5,000 reproducible random-horizon simulations, paired block-bootstrap comparisons, and selection-concentration diagnostics. The selected selector mean was above the random-horizon null mean, but the empirical two-sided p-value was approximately 0.162 and all four paired 95% block-bootstrap intervals crossed zero. Therefore the selector's incremental value is not validated and Phase 5 ML remains gated.
 
@@ -78,3 +78,4 @@ No thresholds, horizons, or features will be optimized during Phase 4C. The purp
 - 2026-09-18: Phase 4C selector robustness implementation and CI workflow added. Temporal split-permutation placebo, chronological split stability, lagged-selection diagnostic, fixed-horizon reference, and direction/time-bucket decomposition are now reproducibly generated from the pinned dataset without optimization.
 
 - 2026-09-18: Phase 4C artifact reviewed. Actual selected mean was +0.190 R/day versus temporal-placebo mean +0.222 R/day; empirical two-sided p=0.264. Chronological split means were +0.012, +0.448, and +0.109 R/day; lagged selection was +0.291 R/day. Fixed-horizon references were +0.111, +0.127, +0.131, and +0.128 R/day for 2/3/5/10 sessions. Phase 4C therefore does not validate incremental selector value, and Phase 5 ML remains gated.
+\n- 2026-09-18: Phase 6 robustness implementation added. Pre-specified diagnostics include 10-session block bootstrap, fixed 2015–2019 versus 2020–2024 chronological stability, volatility terciles using pre-existing D_ATR20/close, LONG/SHORT decomposition, and symmetric ±20% CPR threshold perturbations around the frozen 0.50/1.00 thresholds. No configuration is selected as a winner.\n
