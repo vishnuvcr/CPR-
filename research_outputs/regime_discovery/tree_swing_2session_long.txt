@@ -1,0 +1,10 @@
+|--- prior_day_return_atr <= -0.407
+|   |--- class: 1
+|--- prior_day_return_atr >  -0.407
+|   |--- prior_day_return_atr <= -0.193
+|   |   |--- class: 0
+|   |--- prior_day_return_atr >  -0.193
+|   |   |--- prior_day_range_atr <= 0.601
+|   |   |   |--- class: 1
+|   |   |--- prior_day_range_atr >  0.601
+|   |   |   |--- class: 0

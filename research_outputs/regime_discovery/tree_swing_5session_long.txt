@@ -1,0 +1,19 @@
+|--- atr_pct <= 0.010
+|   |--- close_vs_pdh_atr <= 0.064
+|   |   |--- prior_day_return_atr <= 0.301
+|   |   |   |--- class: 1
+|   |   |--- prior_day_return_atr >  0.301
+|   |   |   |--- class: 1
+|   |--- close_vs_pdh_atr >  0.064
+|   |   |--- class: 1
+|--- atr_pct >  0.010
+|   |--- cpr_width_atr <= 0.138
+|   |   |--- atr_pct <= 0.012
+|   |   |   |--- class: 1
+|   |   |--- atr_pct >  0.012
+|   |   |   |--- class: 0
+|   |--- cpr_width_atr >  0.138
+|   |   |--- atr_pct <= 0.013
+|   |   |   |--- class: 0
+|   |   |--- atr_pct >  0.013
+|   |   |   |--- class: 1

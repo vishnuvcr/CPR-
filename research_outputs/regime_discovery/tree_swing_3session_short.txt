@@ -1,0 +1,16 @@
+|--- atr_pct <= 0.011
+|   |--- atr_pct <= 0.008
+|   |   |--- class: 1
+|   |--- atr_pct >  0.008
+|   |   |--- prior_day_range_atr <= 0.920
+|   |   |   |--- class: 0
+|   |   |--- prior_day_range_atr >  0.920
+|   |   |   |--- class: 0
+|--- atr_pct >  0.011
+|   |--- atr_pct <= 0.014
+|   |   |--- prior_day_return_atr <= -0.479
+|   |   |   |--- class: 0
+|   |   |--- prior_day_return_atr >  -0.479
+|   |   |   |--- class: 1
+|   |--- atr_pct >  0.014
+|   |   |--- class: 0

@@ -1,0 +1,13 @@
+|--- atr_pct <= 0.009
+|   |--- intraday_range_atr <= 0.578
+|   |   |--- class: 1
+|   |--- intraday_range_atr >  0.578
+|   |   |--- class: 1
+|--- atr_pct >  0.009
+|   |--- atr_pct <= 0.011
+|   |   |--- class: 0
+|   |--- atr_pct >  0.011
+|   |   |--- atr_pct <= 0.012
+|   |   |   |--- class: 1
+|   |   |--- atr_pct >  0.012
+|   |   |   |--- class: 0

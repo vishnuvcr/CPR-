@@ -1,0 +1,10 @@
+|--- minute_from_open <= 317.500
+|   |--- minute_from_open <= 7.500
+|   |   |--- class: 1
+|   |--- minute_from_open >  7.500
+|   |   |--- cpr_width_atr <= 0.130
+|   |   |   |--- class: 0
+|   |   |--- cpr_width_atr >  0.130
+|   |   |   |--- class: 1
+|--- minute_from_open >  317.500
+|   |--- class: 1

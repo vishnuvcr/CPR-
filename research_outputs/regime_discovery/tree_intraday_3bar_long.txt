@@ -1,0 +1,16 @@
+|--- intraday_move_atr <= 0.170
+|   |--- minute_from_open <= 132.500
+|   |   |--- intraday_move_atr <= -0.085
+|   |   |   |--- class: 0
+|   |   |--- intraday_move_atr >  -0.085
+|   |   |   |--- class: 1
+|   |--- minute_from_open >  132.500
+|   |   |--- gap_atr <= 0.285
+|   |   |   |--- class: 0
+|   |   |--- gap_atr >  0.285
+|   |   |   |--- class: 1
+|--- intraday_move_atr >  0.170
+|   |--- close_vs_pdl_atr <= 0.862
+|   |   |--- class: 1
+|   |--- close_vs_pdl_atr >  0.862
+|   |   |--- class: 1

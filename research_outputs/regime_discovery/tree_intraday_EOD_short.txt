@@ -1,0 +1,10 @@
+|--- cpr_width_atr <= 0.052
+|   |--- class: 0
+|--- cpr_width_atr >  0.052
+|   |--- prior_day_return_atr <= 0.257
+|   |   |--- cpr_width_atr <= 0.146
+|   |   |   |--- class: 1
+|   |   |--- cpr_width_atr >  0.146
+|   |   |   |--- class: 1
+|   |--- prior_day_return_atr >  0.257
+|   |   |--- class: 0
