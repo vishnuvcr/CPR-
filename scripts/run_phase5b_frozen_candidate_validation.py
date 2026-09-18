@@ -9,6 +9,7 @@ import argparse, re
 from pathlib import Path
 import numpy as np
 import pandas as pd
+from math import sqrt
 
 HORIZONS={"intraday":("1bar","3bar","6bar","12bar","EOD"),
           "swing":("2session","3session","5session","10session")}
@@ -51,19 +52,24 @@ def mean_ci(sel,rng,n=BOOTSTRAPS,block=10):
         sims[i]=np.concatenate([blocks[j] for j in rng.integers(0,len(blocks),nb)])[:len(d)].mean()
     return np.quantile(sims,[.025,.975])
 
+def wilson_interval(successes, trials, z=1.959963984540054):
+    if trials <= 0:
+        return np.nan, np.nan
+    p=successes/trials
+    den=1+z*z/trials
+    centre=(p+z*z/(2*trials))/den
+    half=z*sqrt(p*(1-p)/trials+z*z/(4*trials*trials))/den
+    return max(0.0,centre-half), min(1.0,centre+half)
+
 def confusion_ci(pop,sel,rng,n=BOOTSTRAPS):
-    groups=list(pop.groupby("signal_day",sort=True))
-    if len(groups)<2: return (np.nan,)*6
-    sims=np.empty((n,3))
-    selected=set(sel.index)
-    for i in range(n):
-        sample=pd.concat([groups[j][1] for j in rng.integers(0,len(groups),len(groups))])
-        y=sample.return_R.to_numpy()>0; p=sample.index.isin(selected)
-        tp=np.sum(p&y); fp=np.sum(p&~y); fn=np.sum(~p&y); tn=np.sum(~p&~y)
-        se=tp/(tp+fn) if tp+fn else np.nan; sp=tn/(tn+fp) if tn+fp else np.nan
-        sims[i]=[se,sp,se+sp-1 if np.isfinite(se+sp) else np.nan]
-    lo=np.nanquantile(sims,.025,axis=0); hi=np.nanquantile(sims,.975,axis=0)
-    return (*lo,*hi)
+    # Fast analytic uncertainty intervals avoid repeated pandas resampling.
+    # Youden bounds use conservative component-wise Wilson limits.
+    y=pop.return_R.to_numpy()>0
+    p=pop.index.isin(sel.index)
+    tp=int(np.sum(p&y)); fp=int(np.sum(p&~y)); fn=int(np.sum(~p&y)); tn=int(np.sum(~p&~y))
+    se_lo,se_hi=wilson_interval(tp,tp+fn)
+    sp_lo,sp_hi=wilson_interval(tn,tn+fp)
+    return se_lo,se_hi,sp_lo,sp_hi,se_lo+sp_lo-1 if np.isfinite(se_lo+sp_lo) else np.nan,se_hi+sp_hi-1 if np.isfinite(se_hi+sp_hi) else np.nan
 
 def split_row(pop,sel,split,rng):
     q=pop[pop.split==split]; s=sel[sel.split==split]
@@ -81,9 +87,9 @@ def split_row(pop,sel,split,rng):
                 win_rate=(s.return_R>0).mean() if len(s) else np.nan,
                 sensitivity=se,specificity=sp,youden_J=j,
                 mean_ci95_low=lo,mean_ci95_high=hi,
-                sensitivity_ci95_low=ci[0],sensitivity_ci95_high=ci[3],
-                specificity_ci95_low=ci[1],specificity_ci95_high=ci[4],
-                youden_ci95_low=ci[2],youden_ci95_high=ci[5])
+                sensitivity_ci95_low=ci[0],sensitivity_ci95_high=ci[1],
+                specificity_ci95_low=ci[2],specificity_ci95_high=ci[3],
+                youden_ci95_low=ci[4],youden_ci95_high=ci[5])
 
 def add_split(df):
     y=df.signal_day.dt.year
