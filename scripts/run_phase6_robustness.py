@@ -49,7 +49,7 @@ def block_bootstrap(x,n=BOOTSTRAPS,block=BLOCK,seed=SEED):
         while sum(len(v) for v in vals)<len(x):
             vals.append(blocks[int(rng.integers(0,len(blocks)))])
         sims[i]=np.concatenate(vals)[:len(x)].mean()
-    return (float(np.quantile(sims,.025)),float(x.mean()),float(np.quantile(sims,.975)))
+    return (float(x.mean()),float(np.quantile(sims,.025)),float(np.quantile(sims,.975)))
 
 def event_mean_ci(sel, rng, n=BOOTSTRAPS, block=BLOCK):
     groups=[g.return_R.to_numpy(float) for _,g in sel.groupby("signal_day",sort=True)]
