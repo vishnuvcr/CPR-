@@ -1,4 +1,5 @@
 name: CPR Phase 7 Independent Replication
+# Frozen-data replication; workflow revision 2
 
 on:
   workflow_dispatch:
