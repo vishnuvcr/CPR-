@@ -93,9 +93,15 @@ def make_events(bars):
     daily = bars.resample("1D").agg({"open":"first","high":"max","low":"min","close":"last","volume":"sum"}).dropna()
     x = add_intraday_daily_features(bars, daily_reference_features(daily))
     ctx = make_context(bars).reindex(x.index)
+    intr = build_intraday_events(x, ctx)
+    swing = build_swing_events(x, ctx)
+    if not intr.empty:
+        intr["asset"] = "intraday"
+    if not swing.empty:
+        swing["asset"] = "swing"
     return {
-        "intraday": build_intraday_events(x, ctx),
-        "swing": build_swing_events(x, ctx),
+        "intraday": intr,
+        "swing": swing,
     }
 
 def build_frozen_trees(reference_bars, frontier):
