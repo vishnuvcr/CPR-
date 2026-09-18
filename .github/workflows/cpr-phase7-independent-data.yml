@@ -1,0 +1,43 @@
+name: CPR Phase 7 Independent Data Qualification
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cpr-v1.0-scientific-multi-dimensional-testing
+    paths:
+      - ".github/workflows/cpr-phase7-independent-data.yml"
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install parquet reader
+        run: python -m pip install --upgrade pandas pyarrow
+      - name: Download independent NIFTY index dataset
+        run: |
+          mkdir -p data/phase7
+          curl -L --fail --retry 3             "https://raw.githubusercontent.com/ganeshbiyer/Nse_Historical_Data/main/NIFTY50-INDEX.parquet"             -o data/phase7/NIFTY50-INDEX.parquet
+      - name: Qualify dataset
+        run: |
+          python - <<'PY'
+          import pandas as pd, hashlib
+          p="data/phase7/NIFTY50-INDEX.parquet"
+          df=pd.read_parquet(p)
+          print("SHAPE",df.shape)
+          print("COLUMNS",list(df.columns))
+          print("DTYPES",df.dtypes.to_dict())
+          print("HEAD")
+          print(df.head(5).to_string())
+          print("TAIL")
+          print(df.tail(5).to_string())
+          print("INDEX",df.index.dtype, df.index.min(), df.index.max())
+          for c in df.columns:
+              if "date" in str(c).lower() or "time" in str(c).lower() or "datetime" in str(c).lower():
+                  print("DATECOL",c,"MIN",df[c].min(),"MAX",df[c].max())
+          print("FILE_SHA256",hashlib.sha256(open(p,"rb").read()).hexdigest())
+          PY
