@@ -1,3 +1,4 @@
+# Frozen OOS research workflow: no 2026 fitting or selection.
 name: CPR Phase 9F Regime x Consensus Interaction
 
 on:
@@ -51,7 +52,12 @@ jobs:
 
       - name: Run Phase 9F
         run: |
-          python scripts/run_phase9f_regime_consensus_interaction.py             --reference data/phase9f/reference_5m.csv             --p7 data/phase9f/p7_5m.csv             --p8 data/phase9f/p8_5m.csv             --frontier artifacts/frontier/regime_discovery_train_pareto.csv             --output-dir artifacts/phase9f
+          python scripts/run_phase9f_regime_consensus_interaction.py \
+            --reference data/phase9f/reference_5m.csv \
+            --p7 data/phase9f/p7_5m.csv \
+            --p8 data/phase9f/p8_5m.csv \
+            --frontier artifacts/frontier/regime_discovery_train_pareto.csv \
+            --output-dir artifacts/phase9f
 
       - name: Publish summary
         run: |
