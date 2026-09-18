@@ -139,9 +139,12 @@ def main():
 
     out = Path(a.output_dir)
     out.mkdir(parents=True, exist_ok=True)
-    frontier = pd.read_csv(a.frontier)
+    frontier = pd.read_csv(a.frontier).reset_index(drop=True)
     if len(frontier) != 39:
         raise ValueError(f"Expected exactly 39 frozen candidates, found {len(frontier)}")
+    # Candidate identity is the immutable row position in the verified frozen frontier.
+    # Do not inherit any non-unique IDs that may be present in the source CSV.
+    frontier["candidate_id"] = np.arange(len(frontier), dtype=int)
 
     bars = load_ohlcv_csv(a.input)
     shadow = build_shadow_signals(bars, frontier)
