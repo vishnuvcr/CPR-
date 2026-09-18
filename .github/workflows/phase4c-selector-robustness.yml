@@ -14,6 +14,9 @@ on:
       - '.github/workflows/phase4c-selector-robustness.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   robustness:
     runs-on: ubuntu-latest
