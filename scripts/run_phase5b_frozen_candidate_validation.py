@@ -19,7 +19,7 @@ MIN_YEAR_SIGNALS=50
 
 def parse_rule(rule):
     if not rule or rule=="ALL": return []
-    pat=re.compile(r"^([A-Za-z0-9_]+)\\s*(<=|>)\\s*(-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?)$")
+    pat=re.compile(r"^([A-Za-z0-9_]+)\s*(<=|>)\s*(-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$")
     out=[]
     for clause in rule.split(" AND "):
         m=pat.match(clause.strip())
