@@ -1,0 +1,70 @@
+name: CPR Phase 7 Independent Replication
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cpr-v1.0-scientific-multi-dimensional-testing
+    paths:
+      - ".github/workflows/cpr-phase7-independent-replication.yml"
+      - "scripts/prepare_phase7_independent_nifty.py"
+      - "scripts/run_phase7_independent_replication.py"
+      - "scripts/run_cpr_regime_discovery.py"
+      - "scripts/prepare_reference_nifty.py"
+      - "cpr_lab/**"
+
+jobs:
+  phase7:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          python -m pip install "scikit-learn>=1.5" pyarrow
+      - name: Download frozen Phase 5A reference source
+        run: |
+          mkdir -p data/phase7
+          curl -L --fail --retry 3 "https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv" -o data/phase7/reference.csv
+      - name: Recreate and verify frozen candidate frontier
+        run: |
+          python scripts/prepare_reference_nifty.py --input data/phase7/reference.csv --output data/phase7/reference_5m.csv
+          rm -rf artifacts/phase5a
+          python scripts/run_cpr_regime_discovery.py --input data/phase7/reference_5m.csv --output-dir artifacts/phase5a
+          sha256sum artifacts/phase5a/regime_discovery_train_pareto.csv
+          test "$(sha256sum artifacts/phase5a/regime_discovery_train_pareto.csv | cut -d' ' -f1)" = "601a72f5e64204aee7ff0bb77347d57b0e2b59871b8bc30011282c2dc02c28b2"
+      - name: Download independent source
+        run: |
+          curl -L --fail --retry 3 "https://raw.githubusercontent.com/ganeshbiyer/Nse_Historical_Data/0cf3c94ecc5cfd87cc1823c17f3b2cf63d80f8e9/NIFTY50-INDEX.parquet" -o data/phase7/NIFTY50-INDEX.parquet
+      - name: Prepare independent 5-minute data
+        run: python scripts/prepare_phase7_independent_nifty.py --input data/phase7/NIFTY50-INDEX.parquet --output data/phase7/independent_5m.csv
+      - name: Run frozen replication
+        run: python scripts/run_phase7_independent_replication.py --input data/phase7/independent_5m.csv --frontier artifacts/phase5a/regime_discovery_train_pareto.csv --output-dir artifacts/phase7
+      - name: Publish Phase 7 summary
+        shell: bash
+        run: |
+          echo "## Phase 7 independent replication" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat data/phase7/independent_5m.provenance.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import pandas as pd
+          df=pd.read_csv("artifacts/phase7/phase7_independent_replication.csv")
+          print(f"Frozen candidates evaluated: {len(df)}")
+          print("| Candidate | Horizon | Side | N | Mean R | 95% CI | Sens. | Spec. | Youden J | Positive-year fraction |")
+          print("|---:|---|---|---:|---:|---|---:|---:|---:|---:|")
+          for _,r in df.iterrows():
+              print(f"| {int(r.candidate_id)} | {r.horizon} | {r.side} | {int(r.signals)} | {r.mean_R:.4f} | [{r.ci95_low:.4f}, {r.ci95_high:.4f}] | {r.sensitivity:.3f} | {r.specificity:.3f} | {r.youden_J:.3f} | {r.positive_year_fraction:.3f} |")
+          PY
+      - name: Upload Phase 7 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpr-phase7-independent-replication
+          path: |
+            data/phase7/*.provenance.txt
+            data/phase7/*.source_counts.csv
+            artifacts/phase5a/regime_discovery_train_pareto.csv
+            artifacts/phase7/*.csv
