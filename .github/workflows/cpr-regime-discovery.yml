@@ -1,0 +1,83 @@
+name: CPR conditional regime discovery
+
+on:
+  push:
+    branches: [cpr-v1.0-scientific-multi-dimensional-testing]
+    paths:
+      - 'scripts/run_cpr_regime_discovery.py'
+      - 'scripts/prepare_reference_nifty.py'
+      - 'cpr_lab/**'
+      - 'tests/test_cpr_regime_discovery.py'
+      - 'pyproject.toml'
+      - 'docs/CPR_RESEARCH_PLAN.md'
+      - '.github/workflows/cpr-regime-discovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install research package
+        run: python -m pip install -e '.[research]'
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Run regime discovery unit tests
+        run: python -m pytest -q tests/test_cpr_regime_discovery.py
+      - name: Download pinned reference dataset
+        run: |
+          mkdir -p data/raw data/canonical artifacts/regime-discovery
+          curl -L --fail --retry 3 -o data/raw/nifty50_candlestick_data.csv             https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv
+      - name: Prepare canonical 5-minute data
+        run: python scripts/prepare_reference_nifty.py --input data/raw/nifty50_candlestick_data.csv --output data/canonical/nifty50_5m.csv
+      - name: Validate canonical data
+        run: python -m cpr_lab.data_quality data/canonical/nifty50_5m.csv
+      - name: Run conditional CPR regime discovery
+        run: |
+          python scripts/run_cpr_regime_discovery.py             --input data/canonical/nifty50_5m.csv             --output-dir artifacts/regime-discovery
+      - name: Validate discovery outputs
+        run: |
+          test -s artifacts/regime-discovery/regime_discovery_intraday_events.csv
+          test -s artifacts/regime-discovery/regime_discovery_swing_events.csv
+          test -s artifacts/regime-discovery/regime_discovery_train_pareto.csv
+          test -s artifacts/regime-discovery/regime_discovery_leaf_evaluation.csv
+          test -s artifacts/regime-discovery/regime_discovery_pareto_oos.csv
+          python - <<'PY'
+          import pandas as pd
+          p=pd.read_csv('artifacts/regime-discovery/regime_discovery_train_pareto.csv')
+          e=pd.read_csv('artifacts/regime-discovery/regime_discovery_pareto_oos.csv')
+          assert len(p)>0
+          assert set(e.split)=={'TRAIN','VALIDATION','TEST'}
+          assert {'sensitivity','specificity','mean_R'}.issubset(p.columns)
+          print('Regime discovery validation: PASS')
+          print('\nTRAIN PARETO FRONTIER')
+          print(p.to_string(index=False))
+          print('\nPARETO OOS EVALUATION')
+          print(e.to_string(index=False))
+          PY
+      - name: Publish deterministic regime discovery results
+        run: |
+          mkdir -p research_outputs/regime_discovery
+          cp artifacts/regime-discovery/*.csv research_outputs/regime_discovery/
+          cp artifacts/regime-discovery/*.txt research_outputs/regime_discovery/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research_outputs/regime_discovery/
+          if git diff --cached --quiet; then
+            echo "No regime discovery changes to publish"
+          else
+            git commit -m "Publish CPR conditional regime discovery results [skip ci]"
+            git push
+          fi
+      - name: Upload regime discovery artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpr-conditional-regime-discovery
+          path: artifacts/regime-discovery/
+          retention-days: 90
