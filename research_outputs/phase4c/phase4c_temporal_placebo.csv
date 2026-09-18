@@ -1,0 +1,2 @@
+actual_selected_mean_R,temporal_placebo_mean_R,temporal_placebo_sd_R,placebo_q025_R,placebo_q975_R,actual_minus_placebo_R,empirical_two_sided_p,simulations,seed,placebo_definition
+0.19004843201789587,0.22214278481115343,0.027518616199341227,0.1667427429971347,0.2721429364946801,-0.03209435279325756,0.264,5000,20260918,permute selected horizon across walk-forward splits within side/entry_bucket
