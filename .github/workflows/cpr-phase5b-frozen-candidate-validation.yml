@@ -57,6 +57,23 @@ jobs:
             --frontier artifacts/phase5a/regime_discovery_train_pareto.csv \
             --output-dir artifacts/phase5b
 
+      - name: Publish Phase 5B summary to GitHub Actions
+        shell: bash
+        run: |
+          echo "## Phase 5B frozen-candidate validation" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import pandas as pd
+          p="artifacts/phase5b/phase5b_summary.csv"
+          df=pd.read_csv(p)
+          print(f"Frozen candidates evaluated: {len(df)}")
+          print("")
+          print("| Candidate | Asset | Horizon | Side | Test signals | Test mean R | 95% CI | Sensitivity | Specificity | Youden J | Positive-year fraction |")
+          print("|---:|---|---|---|---:|---:|---|---:|---:|---:|---:|")
+          for _,r in df.iterrows():
+              print(f"| {int(r.candidate_id)} | {r.asset} | {r.source_horizon} | {r.side} | {int(r.test_signals)} | {r.test_mean_R:.4f} | [{r.test_mean_ci95_low:.4f}, {r.test_mean_ci95_high:.4f}] | {r.test_sensitivity:.3f} | {r.test_specificity:.3f} | {r.test_youden_J:.3f} | {r.positive_year_fraction:.3f} |")
+          PY
+
       - name: Upload Phase 5A and 5B artifacts
         uses: actions/upload-artifact@v4
         with:
