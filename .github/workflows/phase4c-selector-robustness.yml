@@ -78,6 +78,19 @@ jobs:
           print(l.to_string(index=False))
           print(g.to_string(index=False))
           PY
+      - name: Publish deterministic Phase 4C results to research branch
+        run: |
+          mkdir -p research_outputs/phase4c
+          cp artifacts/phase4c/*.csv research_outputs/phase4c/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research_outputs/phase4c/
+          if git diff --cached --quiet; then
+            echo "No Phase 4C result changes to publish"
+          else
+            git commit -m "Publish Phase 4C robustness results [skip ci]"
+            git push
+          fi
       - name: Upload Phase 4C artifacts
         uses: actions/upload-artifact@v4
         with:
