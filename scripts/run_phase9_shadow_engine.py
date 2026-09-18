@@ -14,7 +14,7 @@ import pandas as pd
 from cpr_lab.data_quality import load_ohlcv_csv
 from cpr_lab.indicators import add_intraday_daily_features, daily_reference_features
 from cpr_lab.strategies import StrategyConfig, intraday_directional_signals
-from run_cpr_regime_discovery import make_context
+from run_cpr_regime_discovery import build_intraday_events, build_swing_events, make_context
 
 PAT = re.compile(r"^([A-Za-z0-9_]+)\s*(<=|>)\s*(-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$")
 
@@ -76,13 +76,13 @@ def build_shadow_signals(bars: pd.DataFrame, frontier: pd.DataFrame) -> pd.DataF
                         "signal_day": ts.normalize(),
                         "candidate_id": int(c.candidate_id) if "candidate_id" in c else int(cid),
                         "asset": c.asset,
-                        "horizon": c.horizon,
+                        "horizon": c.source_horizon,
                         "side": side,
                         "frozen_rule": c.rule,
                         "entry_convention": "next_bar_open",
                         "signal_close": float(x.iloc[i].close),
                         "next_bar_open": entry_price,
-                        "atr_at_signal": float(x.iloc[i].D_ATR20),
+                        "atr_at_signal": float(x.iloc[i].D_ATR20),\n                        "event_return_R_available": float(event_row.iloc[0].return_R),
                         "cpr_width_atr": float(context.iloc[i]["cpr_width_atr"]),
                         "atr_pct": float(context.iloc[i]["atr_pct"]),
                         "gap_atr": float(context.iloc[i]["gap_atr"]),
