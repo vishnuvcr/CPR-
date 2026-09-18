@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-research = ["pandas-ta>=0.3.14b0"]
+research = ["pandas-ta>=0.3.14b0", "scikit-learn>=1.5"]
 
 [tool.setuptools.packages.find]
 include = ["cpr_lab", "cpr_lab.*"]
