@@ -1,0 +1,63 @@
+name: CPR Phase 9 Shadow Decision Engine
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cpr-v1.0-scientific-multi-dimensional-testing
+    paths:
+      - ".github/workflows/cpr-phase9-shadow.yml"
+      - "scripts/run_phase9_shadow_engine.py"
+      - "scripts/run_cpr_regime_discovery.py"
+      - "scripts/prepare_reference_nifty.py"
+      - "cpr_lab/**"
+
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          python -m pip install "scikit-learn>=1.5"
+      - name: Download frozen reference source
+        run: |
+          mkdir -p data/phase9
+          curl -L --fail --retry 3 "https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv" -o data/phase9/reference.csv
+      - name: Prepare reference data
+        run: python scripts/prepare_reference_nifty.py --input data/phase9/reference.csv --output data/phase9/reference_5m.csv
+      - name: Recreate and verify frozen frontier
+        run: |
+          rm -rf artifacts/frontier
+          python scripts/run_cpr_regime_discovery.py --input data/phase9/reference_5m.csv --output-dir artifacts/frontier
+          test "$(sha256sum artifacts/frontier/regime_discovery_train_pareto.csv | cut -d' ' -f1)" = "601a72f5e64204aee7ff0bb77347d57b0e2b59871b8bc30011282c2dc02c28b2"
+      - name: Run shadow replay
+        run: python scripts/run_phase9_shadow_engine.py --input data/phase9/reference_5m.csv --frontier artifacts/frontier/regime_discovery_train_pareto.csv --output-dir artifacts/phase9
+      - name: Publish shadow summary
+        run: |
+          {
+            echo "## Phase 9 shadow decision engine"
+            echo
+            cat artifacts/phase9/phase9_provenance.csv
+            echo
+            python - <<'PY'
+          import pandas as pd
+          d=pd.read_csv("artifacts/phase9/phase9_shadow_signals.csv")
+          print(f"Shadow signals: {len(d)}")
+          if len(d):
+              print(f"Signal days: {d.signal_day.nunique()}")
+              print(f"Unique candidates activated: {d.candidate_id.nunique()}")
+              print(f"Opposing-side matches: {int(d.groupby('signal_day').side.nunique().gt(1).sum())}")
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload shadow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpr-phase9-shadow-replay
+          path: artifacts/phase9/*.csv
+
