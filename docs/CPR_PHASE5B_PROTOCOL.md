@@ -13,7 +13,7 @@ The candidate definition is therefore fixed before validation/test outcomes are 
 ## Validation dimensions
 For every frozen candidate:
 1. TRAIN, VALIDATION and TEST conditional mean R, win rate, sensitivity, specificity and Youden J.
-2. 95% block-bootstrap CI for mean R, using signal-day means and block length 10.
+2. 95% block-bootstrap CI for mean R, using contiguous signal-day blocks (block length 10) while preserving the event-level mean-R estimand reported in the tables.
 3. Day-block bootstrap intervals for sensitivity, specificity and Youden J.
 4. Calendar-year stability, including annual signal count, mean R and positive year fraction for years with at least 50 candidate signals.
 5. Adjacent-horizon consistency: the same frozen feature condition is applied unchanged to all horizons within the same asset family.
