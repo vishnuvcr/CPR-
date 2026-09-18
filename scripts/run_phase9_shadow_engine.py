@@ -13,7 +13,6 @@ import pandas as pd
 
 from cpr_lab.data_quality import load_ohlcv_csv
 from cpr_lab.indicators import add_intraday_daily_features, daily_reference_features
-from cpr_lab.strategies import StrategyConfig, intraday_directional_signals
 from run_cpr_regime_discovery import build_intraday_events, build_swing_events, make_context
 
 PAT = re.compile(r"^([A-Za-z0-9_]+)\s*(<=|>)\s*(-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$")
@@ -44,58 +43,46 @@ def matches(context_row: pd.Series, rule: str) -> bool:
 
 
 def build_shadow_signals(bars: pd.DataFrame, frontier: pd.DataFrame) -> pd.DataFrame:
-    daily = bars.resample("1D").agg(
-        {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
-    ).dropna()
+    daily = bars.resample("1D").agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}).dropna()
     x = add_intraday_daily_features(bars, daily_reference_features(daily))
     context = make_context(bars).reindex(x.index)
-    sig = intraday_directional_signals(
-        x,
-        StrategyConfig(narrow_x=.5, wide_y=1.0, atr_stop=1, target_r=2, exit_time="15:15"),
-    )
+    intraday_events = build_intraday_events(x, context)
+    swing_events = build_swing_events(x, context)
+    event_sets = {"intraday": intraday_events, "swing": swing_events}
     rows = []
-    for i in range(len(x) - 1):
-        ts = x.index[i]
-        side = "LONG" if bool(sig.loc[ts, "long_entry"]) else "SHORT" if bool(sig.loc[ts, "short_entry"]) else None
-        if side is None or context.iloc[i].isna().any():
+    for asset, event_frame in event_sets.items():
+        if event_frame.empty:
             continue
-        entry_i = i + 1
-        if x.index[entry_i].date() != ts.date():
-            continue
-        entry_price = float(x.iloc[entry_i].open)
-        compatible = frontier[
-            (frontier.asset == "intraday")
-            & (frontier.source_horizon.isin(["1bar", "3bar", "6bar", "12bar", "EOD"]))
-            & (frontier.side == side)
-        ]
-        for cid, c in compatible.reset_index(drop=True).iterrows():
-            if matches(context.iloc[i], c.rule):
-                rows.append(
-                    {
-                        "signal_time": ts,
-                        "signal_day": ts.normalize(),
-                        "candidate_id": int(c.candidate_id) if "candidate_id" in c else int(cid),
-                        "asset": c.asset,
-                        "horizon": c.source_horizon,
-                        "side": side,
-                        "frozen_rule": c.rule,
-                        "entry_convention": "next_bar_open",
-                        "signal_close": float(x.iloc[i].close),
-                        "next_bar_open": entry_price,
-                        "atr_at_signal": float(x.iloc[i].D_ATR20),\n                        "event_return_R_available": float(event_row.iloc[0].return_R),
+        for i in range(len(x) - 1):
+            ts = x.index[i]
+            event_at_ts = event_frame[event_frame.signal_time == ts]
+            if event_at_ts.empty or context.iloc[i].isna().any():
+                continue
+            side = str(event_at_ts.iloc[0].side)
+            entry_i = i + 1
+            if x.index[entry_i].date() != ts.date():
+                continue
+            entry_price = float(x.iloc[entry_i].open)
+            compatible = frontier[(frontier.asset == asset) & (frontier.side == side)]
+            for cid, candidate in compatible.reset_index(drop=True).iterrows():
+                if matches(context.iloc[i], candidate.rule):
+                    rows.append({
+                        "signal_time": ts, "signal_day": ts.normalize(),
+                        "candidate_id": int(candidate.candidate_id) if "candidate_id" in candidate else int(cid),
+                        "asset": candidate.asset, "horizon": candidate.source_horizon, "side": side,
+                        "frozen_rule": candidate.rule, "entry_convention": "next_bar_open",
+                        "signal_close": float(x.iloc[i].close), "next_bar_open": entry_price,
+                        "atr_at_signal": float(x.iloc[i].D_ATR20),
+                        "event_return_R_available": float(event_at_ts[event_at_ts.side == side].iloc[0].return_R),
                         "cpr_width_atr": float(context.iloc[i]["cpr_width_atr"]),
                         "atr_pct": float(context.iloc[i]["atr_pct"]),
                         "gap_atr": float(context.iloc[i]["gap_atr"]),
                         "intraday_move_atr": float(context.iloc[i]["intraday_move_atr"]),
                         "prior_day_return_atr": float(context.iloc[i]["prior_day_return_atr"]),
-                        "phase6_status": "FROZEN_DIAGNOSTIC_ONLY",
-                        "phase7_status": "FROZEN_REPLICATION_ONLY",
-                        "actionable": False,
-                        "mode": "SHADOW",
-                    }
-                )
+                        "phase6_status": "FROZEN_DIAGNOSTIC_ONLY", "phase7_status": "FROZEN_REPLICATION_ONLY",
+                        "actionable": False, "mode": "SHADOW",
+                    })
     return pd.DataFrame(rows)
-
 
 def attach_historical_outcomes(shadow: pd.DataFrame, bars: pd.DataFrame) -> pd.DataFrame:
     if shadow.empty:
