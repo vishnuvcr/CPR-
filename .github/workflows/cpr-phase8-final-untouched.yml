@@ -48,10 +48,10 @@ jobs:
             echo
             python - <<'PY'
           import pandas as pd
-          d=pd.read_csv("artifacts/phase8/phase8_cumulative_results.csv")
+          d = pd.read_csv("artifacts/phase8/phase8_cumulative_results.csv")
           print(f"Frozen candidates evaluated: {d.candidate_id.nunique()}")
           print()
-          print(d.to_markdown(index=False))
+          print(d.to_string(index=False))
           PY
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload Phase 8 artifacts
