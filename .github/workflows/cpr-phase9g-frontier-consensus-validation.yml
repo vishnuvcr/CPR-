@@ -40,8 +40,7 @@ jobs:
       - name: Prepare Phase 7 independent dataset
         run: |
           test "$(curl -sS --fail https://api.github.com/repos/ganeshbiyer/Nse_Historical_Data/git/trees/2a5ef9b3032a26a968b5595a452a77270188058e?recursive=1 | python -c 'import json,sys; print(next(x["sha"] for x in json.load(sys.stdin)["tree"] if x["path"]=="NIFTY50-INDEX.parquet"))')" = "c26c9babf4d7becc628f9fe23d71cd2e9e3c0db9"
-          curl -L --fail --retry 3 "https://raw.githubusercontent.com/ganeshbiyer/Nse_Historical_Data/af4d583e9bc0b5d7567b33bd5ec575cee5cbae3f53e5cbae3/NIFTY50-INDEX.parquet" -o data/phase9g/p7.parquet || \
-          curl -L --fail --retry 3 "https://raw.githubusercontent.com/ganeshbiyer/Nse_Historical_Data/af4d583e9bc0b5d7567b33bd5ec575cee5cbae3/NIFTY50-INDEX.parquet" -o data/phase9g/p7.parquet
+          curl -L --fail --retry 3 "https://raw.githubusercontent.com/ganeshbiyer/Nse_Historical_Data/af4d583e9bc0b5d7567b33bd5ec575cee5cbae3/NIFTY50-INDEX.parquet -o data/phase9g/p7.parquet
           python scripts/prepare_phase7_independent_nifty.py --input data/phase9g/p7.parquet --output data/phase9g/p7_5m.csv
 
       - name: Prepare Phase 8 untouched dataset
