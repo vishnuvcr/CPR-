@@ -5,7 +5,8 @@ from pathlib import Path
 import numpy as np,pandas as pd
 from cpr_lab.data_quality import load_ohlcv_csv
 from cpr_lab.indicators import add_intraday_daily_features,daily_reference_features
-from scripts.run_cpr_regime_discovery import make_context,build_intraday_events,build_swing_events
+# This file is executed directly by CI, so scripts/ is on sys.path.
+from run_cpr_regime_discovery import make_context,build_intraday_events,build_swing_events
 
 SEED=20260918; BOOTSTRAPS=5000; BLOCK=10
 PAT=re.compile(r"^([A-Za-z0-9_]+)\s*(<=|>)\s*(-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$")
@@ -31,7 +32,7 @@ def ci(sel,rng):
     nd=len(groups)
     if nd<2:return np.nan,np.nan
     blocks=[groups[i:i+BLOCK] for i in range(0,nd,BLOCK)]
-    nb=int(np.ceil(nd/BLOCK)); nobs=sum(map(len,groups)); sims=np.empty(BOOTSTRAPS)
+    nobs=sum(map(len,groups)); sims=np.empty(BOOTSTRAPS)
     for i in range(BOOTSTRAPS):
         vals=[]
         while sum(map(len,vals))<nobs:
@@ -77,3 +78,5 @@ def main():
     s.to_csv(out/"phase7_independent_replication.csv",index=False);y.to_csv(out/"phase7_yearly.csv",index=False)
     print("=== PHASE 7 INDEPENDENT REPLICATION ===")
     print(s.to_string(index=False))
+
+if __name__=="__main__": main()
