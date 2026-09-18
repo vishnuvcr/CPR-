@@ -89,10 +89,11 @@ def make_events(bars: pd.DataFrame, nx: float, wy: float) -> pd.DataFrame:
 
 
 def main():
+    global SIMULATIONS
     p=argparse.ArgumentParser()
     p.add_argument("--input",required=True); p.add_argument("--swing-events",required=True); p.add_argument("--output-dir",required=True)
     p.add_argument("--simulations",type=int,default=SIMULATIONS); a=p.parse_args()
-    global SIMULATIONS; SIMULATIONS=a.simulations
+    SIMULATIONS=a.simulations
     out=Path(a.output_dir); out.mkdir(parents=True,exist_ok=True)
     swing=pd.read_csv(a.swing_events,parse_dates=["signal_time","signal_date","entry_session","target_session"])
     swing["signal_day"]=swing.signal_date.dt.normalize()
