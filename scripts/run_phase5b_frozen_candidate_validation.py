@@ -44,12 +44,19 @@ def metrics(pop,sel):
     return se,sp,se+sp-1 if np.isfinite(se+sp) else np.nan
 
 def mean_ci(sel,rng,n=BOOTSTRAPS,block=10):
-    d=sel.groupby("signal_day").return_R.mean().to_numpy()
-    if len(d)<2: return np.nan,np.nan
-    blocks=[d[i:i+block] for i in range(0,len(d),block)]
-    nb=int(np.ceil(len(d)/block)); sims=np.empty(n)
+    # Bootstrap the same event-level mean_R reported by split_row while
+    # preserving within-day dependence via contiguous signal-day blocks.
+    groups=[g.return_R.to_numpy() for _,g in sel.groupby("signal_day",sort=True)]
+    nd=len(groups)
+    if nd<2: return np.nan,np.nan
+    blocks=[groups[i:i+block] for i in range(0,nd,block)]
+    nb=int(np.ceil(nd/block)); sims=np.empty(n)
     for i in range(n):
-        sims[i]=np.concatenate([blocks[j] for j in rng.integers(0,len(blocks),nb)])[:len(d)].mean()
+        chosen=rng.integers(0,len(blocks),nb)
+        sampled_days=[day for j in chosen for day in blocks[j]]
+        sampled_days=sampled_days[:nd]
+        vals=np.concatenate(sampled_days)
+        sims[i]=vals.mean()
     return np.quantile(sims,[.025,.975])
 
 def wilson_interval(successes, trials, z=1.959963984540054):
