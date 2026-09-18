@@ -6,6 +6,7 @@ on:
     branches:
       - cpr-v1.0-scientific-multi-dimensional-testing
     paths:
+      - ".github/workflows/cpr-phase5b-frozen-candidate-validation.yml"
       - "scripts/run_phase5b_frozen_candidate_validation.py"
       - "scripts/run_cpr_regime_discovery.py"
       - "scripts/prepare_reference_nifty.py"
@@ -31,31 +32,21 @@ jobs:
       - name: Download pinned reference source
         run: |
           mkdir -p data/phase5b
-          curl -L --fail --retry 3 \
-            "https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv" \
-            -o data/phase5b/nifty50_candlestick_data.csv
+          curl -L --fail --retry 3             "https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv"             -o data/phase5b/nifty50_candlestick_data.csv
 
       - name: Prepare fixed 5-minute reference data
         run: |
-          python scripts/prepare_reference_nifty.py \
-            --input data/phase5b/nifty50_candlestick_data.csv \
-            --output data/phase5b/reference_nifty_5m.csv
+          python scripts/prepare_reference_nifty.py             --input data/phase5b/nifty50_candlestick_data.csv             --output data/phase5b/reference_nifty_5m.csv
 
       - name: Run Phase 5A discovery with frozen provenance
         run: |
           rm -rf artifacts/phase5a
-          python scripts/run_cpr_regime_discovery.py \
-            --input data/phase5b/reference_nifty_5m.csv \
-            --output-dir artifacts/phase5a
+          python scripts/run_cpr_regime_discovery.py             --input data/phase5b/reference_nifty_5m.csv             --output-dir artifacts/phase5a
 
       - name: Run Phase 5B frozen-candidate validation
         run: |
           rm -rf artifacts/phase5b
-          python scripts/run_phase5b_frozen_candidate_validation.py \
-            --intraday-events artifacts/phase5a/regime_discovery_intraday_events.csv \
-            --swing-events artifacts/phase5a/regime_discovery_swing_events.csv \
-            --frontier artifacts/phase5a/regime_discovery_train_pareto.csv \
-            --output-dir artifacts/phase5b
+          python scripts/run_phase5b_frozen_candidate_validation.py             --intraday-events artifacts/phase5a/regime_discovery_intraday_events.csv             --swing-events artifacts/phase5a/regime_discovery_swing_events.csv             --frontier artifacts/phase5a/regime_discovery_train_pareto.csv             --output-dir artifacts/phase5b
 
       - name: Publish Phase 5B summary to GitHub Actions
         shell: bash
