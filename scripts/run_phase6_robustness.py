@@ -1,152 +1,189 @@
-"""Phase 6: pre-specified robustness and falsification diagnostics.
+"""Phase 6: pre-specified robustness and falsification of frozen CPR regimes.
 
-No optimization: fixed subperiods, volatility terciles, direction splits,
-dependence-aware block bootstrap, and symmetric CPR-threshold perturbations.
+Phase 5A TRAIN-Pareto candidates are treated as frozen. No threshold is fitted
+or selected from validation/test outcomes here.
 """
 from __future__ import annotations
-import argparse
+import argparse, re
 from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from cpr_lab.data_quality import load_ohlcv_csv
-from cpr_lab.indicators import add_intraday_daily_features, daily_reference_features
-from cpr_lab.strategies import StrategyConfig, intraday_directional_signals
-
-HORIZONS=(2,3,5,10)
+SEED=20260918
 BLOCK=10
-SIMULATIONS=5000
-PERTURBATIONS=((0.40,0.80),(0.50,1.00),(0.60,1.20))
+BOOTSTRAPS=5000
+PLACEBO_SIMS=5000
+MIN_YEAR_SIGNALS=30
+PERTURB_FRACTION=0.20
 
+def parse_rule(rule):
+    if not rule or rule=="ALL": return []
+    pat=re.compile(r"^([A-Za-z0-9_]+)\\s*(<=|>)\\s*(-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?)$")
+    out=[]
+    for clause in rule.split(" AND "):
+        m=pat.match(clause.strip())
+        if not m: raise ValueError(f"Cannot parse frozen rule clause: {clause!r}")
+        out.append((m.group(1),m.group(2),float(m.group(3))))
+    return out
 
-def daily_mean(z: pd.DataFrame) -> pd.Series:
-    return z.groupby("signal_day",as_index=False)["return_R"].mean().set_index("signal_day")["return_R"]
+def rule_mask(df, rule):
+    m=np.ones(len(df),dtype=bool)
+    for col,op,v in parse_rule(rule):
+        if col not in df.columns: raise KeyError(col)
+        x=df[col].to_numpy(float)
+        m &= x <= v if op=="<=" else x > v
+    return pd.Series(m,index=df.index)
 
+def event_mean_ci(sel, rng, n=BOOTSTRAPS, block=BLOCK):
+    # Event-weighted mean-R estimand, with contiguous signal-day blocks.
+    groups=[g.return_R.to_numpy(float) for _,g in sel.groupby("signal_day",sort=True)]
+    nd=len(groups)
+    if nd<2: return np.nan,np.nan
+    blocks=[groups[i:i+block] for i in range(0,nd,block)]
+    nb=int(np.ceil(nd/block)); sims=np.empty(n)
+    for i in range(n):
+        vals=[]
+        while sum(map(len,vals)) < sum(map(len,groups)):
+            vals.extend(blocks[int(rng.integers(0,len(blocks)))])
+        sims[i]=np.concatenate(vals)[:sum(map(len,groups))].mean()
+    return float(np.quantile(sims,.025)),float(np.quantile(sims,.975))
 
-def block_bootstrap(values: np.ndarray, simulations: int, block: int, seed: int=20260918) -> tuple[float,float,float,float]:
-    x=np.asarray(values,float); x=x[np.isfinite(x)]
-    if len(x)<2: return (np.nan,np.nan,np.nan,np.nan)
-    rng=np.random.default_rng(seed)
-    blocks=[x[i:i+block] for i in range(0,len(x)-block+1,block)]
-    if not blocks: blocks=[x]
-    means=np.empty(simulations)
-    n=len(x)
-    for k in range(simulations):
-        sample=[]
-        while len(sample)<n:
-            sample.extend(blocks[int(rng.integers(0,len(blocks)))])
-        means[k]=np.mean(sample[:n])
-    return float(np.mean(x)),float(np.quantile(means,.025)),float(np.quantile(means,.975)),float(np.mean(means))
+def daily_mean(sel):
+    return sel.groupby("signal_day",sort=True).return_R.mean().to_numpy(float)
 
+def day_bootstrap_ci(sel,rng,n=BOOTSTRAPS):
+    x=daily_mean(sel); x=x[np.isfinite(x)]
+    if len(x)<2: return np.nan,np.nan
+    sims=rng.choice(x,size=(n,len(x)),replace=True).mean(axis=1)
+    return float(np.quantile(sims,.025)),float(np.quantile(sims,.975))
 
-def characterize(events: pd.DataFrame, label: str) -> pd.DataFrame:
-    rows=[]
-    for h,z in events.groupby("horizon",sort=True):
-        d=daily_mean(z); mean,lo,hi,boot=block_bootstrap(d.to_numpy(),SIMULATIONS,BLOCK)
-        rows.append({"configuration":label,"horizon":h,"signals":len(z),"signal_days":len(d),
-                      "mean_R":mean,"block_bootstrap_95_lo":lo,"block_bootstrap_95_hi":hi,
-                      "bootstrap_mean":boot,"win_day_rate":float((d>0).mean())})
-        for side in ("LONG","SHORT"):
-            q=z[z.side==side]; dd=daily_mean(q)
-            if len(dd):
-                m,l,u,b=block_bootstrap(dd.to_numpy(),SIMULATIONS,BLOCK)
-                rows.append({"configuration":label,"horizon":h,"signals":len(q),"signal_days":len(dd),
-                             "mean_R":m,"block_bootstrap_95_lo":l,"block_bootstrap_95_hi":u,
-                             "bootstrap_mean":b,"win_day_rate":float((dd>0).mean()),"side":side})
-    return pd.DataFrame(rows)
+def placebo_p_daily(pop,sel,rng,n=PLACEBO_SIMS):
+    # Falsification test at the signal-day level: preserve the observed number
+    # of selected signal days and compare against random day subsets.
+    days=pop.groupby("signal_day",sort=True).return_R.mean()
+    chosen=sel.groupby("signal_day",sort=True).return_R.mean()
+    if len(chosen)<2 or len(days)<=len(chosen): return np.nan
+    obs=float(chosen.mean()); vals=days.to_numpy(float); k=len(chosen)
+    sims=np.empty(n)
+    for i in range(n):
+        sims[i]=rng.choice(vals,size=k,replace=False).mean()
+    return float((1+np.sum(sims>=obs))/(n+1))
 
+def perturb_rule(rule, frac=PERTURB_FRACTION):
+    clauses=parse_rule(rule)
+    out=[]
+    for i,(col,op,v) in enumerate(clauses):
+        delta=frac*abs(v) if v!=0 else frac
+        for nv,tag in ((v-delta,"minus"),(v+delta,"plus")):
+            c=clauses.copy(); c[i]=(col,op,nv)
+            text=" AND ".join(f"{a} {b} {x:.12g}" for a,b,x in c)
+            out.append((f"clause{i+1}_{tag}",text))
+    return out
 
-def make_events(bars: pd.DataFrame, nx: float, wy: float) -> pd.DataFrame:
-    daily=bars.resample("1D").agg({"open":"first","high":"max","low":"min","close":"last","volume":"sum"}).dropna()
-    x=add_intraday_daily_features(bars,daily_reference_features(daily))
-    sig=intraday_directional_signals(x,StrategyConfig(narrow_x=nx,wide_y=wy,atr_stop=1.0,target_r=2.0,exit_time="15:15"))
-    session_dates=pd.Series(x.index.date,index=x.index)
-    sessions=pd.Index(sorted(session_dates.unique()))
-    pos={d:i for i,d in enumerate(sessions)}
-    rows=[]
-    for i in range(len(x)-1):
-        ts=x.index[i]
-        side="LONG" if bool(sig.loc[ts,"long_entry"]) else "SHORT" if bool(sig.loc[ts,"short_entry"]) else None
-        atr=x.iloc[i].get("D_ATR20"); width=x.iloc[i].get("D_CPR_width_ATR_ratio")
-        if side is None or pd.isna(atr) or float(atr)<=0 or pd.isna(width): continue
-        entry_i=i+1; entry_ts=x.index[entry_i]; ed=entry_ts.date()
-        if ed not in pos: continue
-        direction=1 if side=="LONG" else -1
-        for h in HORIZONS:
-            ti=pos[ed]+h-1
-            if ti>=len(sessions): continue
-            td=sessions[ti]
-            end=np.flatnonzero(session_dates.to_numpy()==td)
-            if len(end)==0: continue
-            future=x.iloc[entry_i:int(end[-1])+1]
-            pnl=direction*(float(future.iloc[-1].close)-float(x.iloc[entry_i].open))
-            mfe=direction*((future.high.max() if direction==1 else future.low.min())-float(x.iloc[entry_i].open))
-            mae=direction*((future.low.min() if direction==1 else future.high.max())-float(x.iloc[entry_i].open))
-            rows.append({"signal_day":pd.Timestamp(ts.date()),"signal_time":ts,"side":side,"horizon":f"{h}session",
-                         "return_R":pnl/float(atr),"mfe_R":mfe/float(atr),"mae_R":mae/float(atr),
-                         "D_ATR20_pct":100*float(atr)/float(x.iloc[i].close)})
-    return pd.DataFrame(rows)
-
+def metric_row(pop,sel):
+    y=pop.return_R.to_numpy(float)>0
+    p=pop.index.isin(sel.index)
+    tp=int(np.sum(p&y)); fp=int(np.sum(p&~y)); fn=int(np.sum(~p&y)); tn=int(np.sum(~p&~y))
+    se=tp/(tp+fn) if tp+fn else np.nan
+    sp=tn/(tn+fp) if tn+fp else np.nan
+    return se,sp,se+sp-1 if np.isfinite(se+sp) else np.nan
 
 def main():
-    global SIMULATIONS
-    p=argparse.ArgumentParser()
-    p.add_argument("--input",required=True); p.add_argument("--swing-events",required=True); p.add_argument("--output-dir",required=True)
-    p.add_argument("--simulations",type=int,default=SIMULATIONS); a=p.parse_args()
-    SIMULATIONS=a.simulations
+    ap=argparse.ArgumentParser()
+    ap.add_argument("--intraday-events",required=True)
+    ap.add_argument("--swing-events",required=True)
+    ap.add_argument("--frontier",required=True)
+    ap.add_argument("--output-dir",required=True)
+    ap.add_argument("--bootstraps",type=int,default=BOOTSTRAPS)
+    ap.add_argument("--placebo-sims",type=int,default=PLACEBO_SIMS)
+    a=ap.parse_args()
     out=Path(a.output_dir); out.mkdir(parents=True,exist_ok=True)
-    swing=pd.read_csv(a.swing_events,parse_dates=["signal_time","signal_date","entry_session","target_session"])
-    swing["signal_day"]=swing.signal_date.dt.normalize()
+    frontier=pd.read_csv(a.frontier)
+    if frontier.empty: raise RuntimeError("No frozen Phase 5A TRAIN-Pareto candidates.")
+    events={
+        "intraday":pd.read_csv(a.intraday_events,parse_dates=["signal_time","signal_day"]),
+        "swing":pd.read_csv(a.swing_events,parse_dates=["signal_time","signal_day"]),
+    }
+    rng=np.random.default_rng(SEED)
 
-    base=characterize(swing,"baseline")
-    base.to_csv(out/"phase6_block_bootstrap.csv",index=False)
+    summary=[]; yearly=[]; adjacent=[]; perturb=[]
+    for cid,c in frontier.reset_index(drop=True).iterrows():
+        e=events[c.asset]
+        base=e[(e.horizon==c.horizon)&(e.side==c.side)].dropna(subset=["return_R"]).copy()
+        test=base[base.signal_day.dt.year>=2022]
+        selected=base[rule_mask(base,c.rule)]
+        stest=test[rule_mask(test,c.rule)]
+        lo,hi=event_mean_ci(stest,rng,a.bootstraps)
+        dlo,dhi=day_bootstrap_ci(stest,rng,a.bootstraps)
+        se,sp,j=metric_row(test,stest)
+        p=placebo_p_daily(test,stest,rng,a.placebo_sims)
+        summary.append({
+            "candidate_id":cid,"asset":c.asset,"source_horizon":c.horizon,"side":c.side,
+            "rule":c.rule,"test_signals":len(stest),"test_signal_days":stest.signal_day.nunique(),
+            "test_mean_R":stest.return_R.mean() if len(stest) else np.nan,
+            "test_mean_ci95_low":lo,"test_mean_ci95_high":hi,
+            "test_daily_mean_ci95_low":dlo,"test_daily_mean_ci95_high":dhi,
+            "test_sensitivity":se,"test_specificity":sp,"test_youden_J":j,
+            "placebo_p_daily":p,
+        })
+        for year,q in test.groupby(test.signal_day.dt.year):
+            s=q[rule_mask(q,c.rule)]
+            se2,sp2,j2=metric_row(q,s)
+            yearly.append({"candidate_id":cid,"asset":c.asset,"horizon":c.horizon,"side":c.side,
+                            "year":int(year),"population":len(q),"signals":len(s),
+                            "mean_R":s.return_R.mean() if len(s) else np.nan,
+                            "sensitivity":se2,"specificity":sp2,"youden_J":j2})
+        for h in (("1bar","3bar","6bar","12bar","EOD") if c.asset=="intraday" else ("2session","3session","5session","10session")):
+            q=e[(e.horizon==h)&(e.side==c.side)]
+            q=q[q.signal_day.dt.year>=2022]
+            s=q[rule_mask(q,c.rule)]
+            adjacent.append({"candidate_id":cid,"asset":c.asset,"source_horizon":c.horizon,
+                             "evaluated_horizon":h,"side":c.side,"signals":len(s),
+                             "mean_R":s.return_R.mean() if len(s) else np.nan,
+                             "positive":bool(len(s) and s.return_R.mean()>0)})
+        for tag,prule in perturb_rule(c.rule):
+            s=test[rule_mask(test,prule)]
+            perturb.append({"candidate_id":cid,"asset":c.asset,"source_horizon":c.horizon,
+                            "side":c.side,"perturbation":tag,"rule":prule,
+                            "signals":len(s),"retention":len(s)/len(stest) if len(stest) else np.nan,
+                            "mean_R":s.return_R.mean() if len(s) else np.nan,
+                            "positive":bool(len(s) and s.return_R.mean()>0)})
 
-    # Fixed chronological eras; no search over boundaries.
-    eras=[("2015-2019","2015-01-01","2019-12-31"),("2020-2024","2020-01-01","2024-12-31")]
-    rows=[]
-    for label,start,end in eras:
-        z=swing[(swing.signal_day>=start)&(swing.signal_day<=end)]
-        q=characterize(z,label); rows.append(q)
-    pd.concat(rows,ignore_index=True).to_csv(out/"phase6_subperiod_stability.csv",index=False)
+    s=pd.DataFrame(summary); y=pd.DataFrame(yearly); ad=pd.DataFrame(adjacent); pe=pd.DataFrame(perturb)
+    # Benjamini-Hochberg q-values over the 39 frozen candidate placebo tests.
+    p=s.placebo_p_daily.to_numpy(float); order=np.argsort(np.where(np.isfinite(p),p,1.0))
+    q=np.full(len(s),np.nan); finite=np.isfinite(p); m=int(finite.sum())
+    if m:
+        vals=p[order][:m]; adj=np.minimum.accumulate((vals*m/np.arange(1,m+1))[::-1])[::-1]
+        q[order[:m]]=np.minimum(adj,1.0)
+    s["placebo_q_fdr"]=q
+    s["ci_excludes_zero"]=s.test_mean_ci95_low>0
+    pp=pe.groupby("candidate_id").positive.mean().rename("perturb_positive_fraction")
+    aa=ad.groupby("candidate_id").positive.mean().rename("adjacent_positive_fraction")
+    yy=y[y.signals>=MIN_YEAR_SIGNALS].groupby("candidate_id").mean_R.agg(
+        positive_year_fraction=lambda x: float((x>0).mean()),
+        years_with_min_signals="count").reset_index()
+    s=s.merge(pp,left_on="candidate_id",right_index=True,how="left").merge(aa,left_on="candidate_id",right_index=True,how="left").merge(yy,on="candidate_id",how="left")
+    s["robustness_profile"] = np.select(
+        [s.ci_excludes_zero & (s.placebo_q_fdr<=0.10) & (s.perturb_positive_fraction>=0.75),
+         s.ci_excludes_zero & (s.perturb_positive_fraction>=0.50)],
+        ["strong_evidence_profile","directionally_stable_profile"],default="fragile_or_uncertain_profile")
+    s["selection_note"]="Diagnostic only; no candidate selected."
+    s.to_csv(out/"phase6_candidate_robustness.csv",index=False)
+    y.to_csv(out/"phase6_yearly_test_stability.csv",index=False)
+    ad.to_csv(out/"phase6_adjacent_horizon_test.csv",index=False)
+    pe.to_csv(out/"phase6_threshold_perturbation_test.csv",index=False)
+    pd.DataFrame([{"candidate_count":len(frontier),"seed":SEED,"bootstrap_replicates":a.bootstraps,
+                   "placebo_sims":a.placebo_sims,"block_length":BLOCK,"min_year_signals":MIN_YEAR_SIGNALS,
+                   "perturbation_fraction":PERTURB_FRACTION,
+                   "note":"All Phase 5A TRAIN-Pareto rules frozen; Phase 6 performs diagnostics only."}]
+                ).to_csv(out/"phase6_provenance.csv",index=False)
+    print("=== PHASE 6 ROBUSTNESS SUMMARY ===")
+    print(s[["candidate_id","asset","source_horizon","side","test_signals","test_mean_R",
+             "test_mean_ci95_low","test_mean_ci95_high","test_sensitivity","test_specificity",
+             "test_youden_J","placebo_q_fdr","perturb_positive_fraction","adjacent_positive_fraction",
+             "robustness_profile"]].to_string(index=False))
+    print(f"Frozen candidates evaluated: {len(s)}")
+    print("No candidate selected.")
 
-    # Volatility terciles are descriptive partitions of the pre-existing D_ATR20/close.
-    v=swing.copy()
-    v["vol_rank"]=v.groupby("horizon")["width_ratio"].transform(lambda s: s.rank(pct=True))
-    # width_ratio is not volatility; use signal-day ATR/close merged from canonical data below.
-    bars=load_ohlcv_csv(a.input)
-    daily=bars.resample("1D").agg({"open":"first","high":"max","low":"min","close":"last","volume":"sum"}).dropna()
-    x=add_intraday_daily_features(bars,daily_reference_features(daily))
-    vol=x[["D_ATR20"]].copy()
-    vol["signal_day"]=vol.index.normalize()
-    vol_daily=vol.groupby("signal_day").D_ATR20.first()
-    close_daily=x.groupby(x.index.normalize()).close.first()
-    vol_ratio=(vol_daily/close_daily).dropna()
-    v["vol_ratio"]=v.signal_day.map(vol_ratio)
-    v["vol_tercile"]=pd.qcut(v.vol_ratio,3,labels=["LOW","MID","HIGH"],duplicates="drop")
-    vol_rows=[]
-    for bucket,z in v.groupby(["vol_tercile","horizon"],observed=True):
-        d=daily_mean(z); m,l,u,b=block_bootstrap(d.to_numpy(),SIMULATIONS,BLOCK)
-        vol_rows.append({"vol_tercile":str(bucket[0]),"horizon":bucket[1],"signals":len(z),"signal_days":len(d),
-                         "mean_R":m,"block_bootstrap_95_lo":l,"block_bootstrap_95_hi":u})
-    pd.DataFrame(vol_rows).to_csv(out/"phase6_volatility_regimes.csv",index=False)
-
-    # Direction-only decomposition on the frozen baseline signal population.
-    dir_rows=[]
-    for side,z in swing.groupby(["side","horizon"]):
-        d=daily_mean(z); m,l,u,b=block_bootstrap(d.to_numpy(),SIMULATIONS,BLOCK)
-        dir_rows.append({"side":side[0],"horizon":side[1],"signals":len(z),"signal_days":len(d),
-                         "mean_R":m,"block_bootstrap_95_lo":l,"block_bootstrap_95_hi":u})
-    pd.DataFrame(dir_rows).to_csv(out/"phase6_direction_robustness.csv",index=False)
-
-    # Symmetric ±20% perturbation around frozen thresholds. No selection/winner is chosen.
-    perturb=[]
-    for nx,wy in PERTURBATIONS:
-        e=make_events(bars,nx,wy)
-        if e.empty: continue
-        q=characterize(e,f"narrow={nx:.2f},wide={wy:.2f}")
-        perturb.append(q)
-    pd.concat(perturb,ignore_index=True).to_csv(out/"phase6_threshold_perturbation.csv",index=False)
-
-    print("=== Phase 6 baseline block bootstrap ==="); print(base.to_string(index=False))
-    print("\nPhase 6 robustness outputs written.")
 if __name__=="__main__": main()
