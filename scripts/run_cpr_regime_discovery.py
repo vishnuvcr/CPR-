@@ -45,8 +45,7 @@ def make_context(bars: pd.DataFrame) -> pd.DataFrame:
     day=x.index.normalize()
     prior_close=daily.close.shift(1)
     prior_range=(daily.high-daily.low).shift(1)
-    prior_ret=daily.close.pct_change().shift(1)
-    prior_atr=dfeat["D_ATR20"]
+    prior_abs_move=daily.close.diff().shift(1)
     day_open=x.groupby(day).open.transform("first")
     day_high=x.groupby(day).high.cummax()
     day_low=x.groupby(day).low.cummin()
@@ -67,7 +66,7 @@ def make_context(bars: pd.DataFrame) -> pd.DataFrame:
     out["close_vs_pdh_atr"]=(x.close-x.D_PDH)/atr_safe
     out["close_vs_pdl_atr"]=(x.close-x.D_PDL)/atr_safe
     day_key=day
-    out["prior_day_return_atr"]=day_key.map((prior_ret*prior_close)/dfeat["D_ATR20"])
+    out["prior_day_return_atr"]=day_key.map(prior_abs_move/dfeat["D_ATR20"])
     out["prior_day_range_atr"]=day_key.map(prior_range/dfeat["D_ATR20"])
     out["minute_from_open"]=((x.index.hour*60+x.index.minute)-555).astype(float)
     # Direction-aware extension beyond the trigger. Positive for a valid breakout.
