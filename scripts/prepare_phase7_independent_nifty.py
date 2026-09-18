@@ -34,7 +34,10 @@ def main():
     x=x.sort_index().between_time("09:15","15:29")
     bad=((x.high<x.low)|(x.open>x.high)|(x.open<x.low)|(x.close>x.high)|(x.close<x.low)|x[["open","high","low","close"]].isna().any(axis=1))
     print(f"source_invalid_or_missing_ohlc={int(bad.sum())}")
-    if bad.any(): raise ValueError(f"Invalid/missing OHLC rows: {int(bad.sum())}")
+    if bad.any():
+        # Do not repair/fill malformed source observations. Exclude them and
+        # retain the count in provenance so the independent source remains auditable.
+        x=x.loc[~bad].copy()
     bucket=x.index.floor("5min")
     bars_all=x.groupby(bucket,sort=True).agg(open=("open","first"),high=("high","max"),low=("low","min"),close=("close","last"),volume=("volume","sum"))
     counts=x.close.groupby(bucket,sort=True).count()
@@ -64,6 +67,7 @@ def main():
         f"replication_start={REPLICATION_START}",
         f"source_rows={len(raw)}",
         f"source_sessions={x.index.normalize().nunique()}",
+        f"source_invalid_or_missing_ohlc_excluded={int(bad.sum())}",
         f"source_start={x.index.min()}",
         f"source_end={x.index.max()}",
         f"five_minute_bins_before_filter={len(bars_all)}",
