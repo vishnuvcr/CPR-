@@ -15,6 +15,13 @@ HORIZONS = (1, 3, 6, 12)
 NARROW_X = 0.50
 WIDE_Y = 1.00
 
+def same_session_horizon_position(index: pd.DatetimeIndex, entry_pos: int, horizon_bars: int) -> int | None:
+    """Return the exit position only when the horizon stays inside entry session."""
+    j = entry_pos + horizon_bars - 1
+    if j >= len(index):
+        return None
+    return j if index[j].date() == index[entry_pos].date() else None
+
 
 def pvalue_mean(values: pd.Series) -> float:
     x = pd.to_numeric(values, errors="coerce").dropna().to_numpy(float)
@@ -69,7 +76,6 @@ def main() -> None:
         entry_ts = x.index[entry_i]
         # A horizon is only valid if its exit remains inside the same trading session.
         # This prevents an intraday horizon from silently becoming an overnight/BTST test.
-        same_session = x.index.date == entry_ts.date()
         entry_positions = np.flatnonzero(x.index == entry_ts)
         if len(entry_positions) == 0:
             continue
@@ -81,8 +87,8 @@ def main() -> None:
         entry = float(x.iloc[entry_i].open)
 
         for h in HORIZONS:
-            j = entry_pos + h - 1
-            if j >= len(x) or not same_session[j]:
+            j = same_session_horizon_position(x.index, entry_pos, h)
+            if j is None:
                 continue
             close = float(x.iloc[j].close)
             future = x.iloc[entry_pos:j+1]
