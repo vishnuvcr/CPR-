@@ -69,7 +69,7 @@ def build_shadow_signals(bars: pd.DataFrame, frontier: pd.DataFrame) -> pd.DataF
                     rows.append({
                         "signal_time": ts, "signal_day": ts.normalize(),
                         "candidate_id": int(candidate.candidate_id) if "candidate_id" in candidate else int(cid),
-                        "asset": candidate.asset, "horizon": candidate.source_horizon, "side": side,
+                        "asset": candidate.asset, "horizon": candidate.horizon, "side": side,
                         "frozen_rule": candidate.rule, "entry_convention": "next_bar_open",
                         "signal_close": float(x.iloc[i].close), "next_bar_open": entry_price,
                         "atr_at_signal": float(x.iloc[i].D_ATR20),
