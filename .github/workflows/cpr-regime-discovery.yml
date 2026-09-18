@@ -26,7 +26,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install research package
-        run: python -m pip install -e '.[research]'
+        run: python -m pip install -e .
+      - name: Install regime-discovery dependency
+        run: python -m pip install scikit-learn>=1.5
       - name: Install test runner
         run: python -m pip install pytest
       - name: Run regime discovery unit tests
