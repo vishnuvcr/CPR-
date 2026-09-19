@@ -53,6 +53,19 @@ Latest active Phase 9G workflow:
 
 The latest 9G run was started after correcting a shell-quoting failure in the Phase 7 dataset download step. At the point of this ledger update, the run status is still being monitored; **no 9G scientific conclusion is recorded yet**.
 
+### 1A — Current state override (2026-09-20)
+
+Phase 9H is **COMPLETE**. The verified workflow 35459389390 and artifact 10589707833 established a usable research conclusion but did not establish a deployable strategy. The project has now advanced to:
+
+- Active phase: **9I — Prospective Chronological Validation**
+- Branch: `cpr-v1.0-phase9i-prospective-validation`
+- Frozen candidate: **LEAF_4 / SHORT / 10-session swing / ATR 1R stop + 2R target**
+- Fresh holdout cutoff: **2026-09-17 15:30 Asia/Kolkata**
+- 2026 refitting/re-selection: **FORBIDDEN**
+- Early zero-trade runs are treated as data-readiness states, not as negative strategy evidence.
+
+The older Phase 9G/9H execution text in Section 1 is retained as historical provenance. This override is the current state for continuation.
+
 ### Read-before-next-step rule
 
 Before any Phase 9G result interpretation or Phase 10/next-phase creation:
@@ -683,3 +696,22 @@ Workflow run: 35457500756. Preparation, frozen frontier verification, Phase 7 an
 - Because the independent Phase 7 interval includes zero, the candidate is not promoted to paper/live trading.
 - Phase 9H exit criterion is satisfied: the project has a usable research conclusion and a concrete candidate for prospective validation.
 - Continuity checkpoint: `docs/CPR_CONTINUITY_CHECKPOINT.md`.
+
+
+## 25. Phase 9I initiation — 2026-09-20
+
+**Question:** Does the frozen Phase 9H candidate retain economically meaningful performance on genuinely new chronological observations after the Phase 8 2026 cutoff?
+
+**Pre-registered candidate:** LEAF_4 / SHORT / 10-session swing / ATR 1R stop + 2R target.
+
+**Frozen rules:** next-bar entry; 1R ATR stop; 2R target; stop-first same-bar resolution; gap exit at bar open; otherwise close of the 10th trading session; no pyramiding in the deployment-like portfolio diagnostic.
+
+**Cutoff:** 2026-09-17 15:30 Asia/Kolkata.
+
+**Data policy:** resolve the newest immutable upstream 2026 source commit on each run; record its commit and SHA256; cache it by commit; never alter the candidate or frontier based on new observations.
+
+**Maturity condition:** 30 completed non-overlapping trades or 90 calendar days after cutoff with sufficient completed observations. Until then, the workflow is an active prospective holdout and not a deployment gate.
+
+**Outputs:** `docs/phase9i/run_log.md` plus machine-readable provenance, completed events, pending signals, event summaries, portfolio summaries and run state.
+
+**Chat/session decision:** The user instructed autonomous continuation and automatic error correction. Phase 9I therefore uses scheduled/manual workflow execution with persistent run logs; routine implementation errors must be fixed and logged without altering the frozen hypothesis.
