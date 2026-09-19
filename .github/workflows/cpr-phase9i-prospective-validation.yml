@@ -1,0 +1,305 @@
+name: CPR Phase 9I Prospective Chronological Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: "Optional immutable NIFTY50 2026 source commit SHA; blank = latest commit containing NIFTY50-INDEX.parquet"
+        required: false
+        type: string
+        default: ""
+  schedule:
+    - cron: "0 13 * * 1-5"
+  push:
+    branches:
+      - cpr-v1.0-phase9i-prospective-validation
+    paths:
+      - ".github/workflows/cpr-phase9i-prospective-validation.yml"
+      - "scripts/run_phase9i_prospective_validation.py"
+      - "scripts/prepare_phase9i_current_nifty.py"
+      - "scripts/run_cpr_regime_discovery.py"
+      - "scripts/run_phase9g_frontier_consensus_validation.py"
+      - "scripts/run_phase9h_economic_strategy_validation.py"
+      - "scripts/prepare_reference_nifty.py"
+      - "cpr_lab/**"
+
+concurrency:
+  group: cpr-phase9i-prospective-validation
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  REFERENCE_COMMIT: "81800ba10cf47e9c7806b6a40e300ef389187846"
+  REFERENCE_URL_BASE: "https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data"
+  FROZEN_FRONTIER_SHA256: "601a72f5e64204aee7ff0bb77347d57b0e2b59871b8bc30011282c2dc02c28b2"
+  FRESH_SOURCE_REPO: "ganeshbiyer/Nse_Historical_Data_2026"
+  CUTOFF_ISO: "2026-09-17T15:30:00+05:30"
+
+jobs:
+  prospective-validation:
+    runs-on: ubuntu-latest
+    outputs:
+      source_commit: ${{ steps.source.outputs.commit }}
+      source_sha256: ${{ steps.source_sha.outputs.sha256 }}
+      run_status: ${{ steps.evaluate.outputs.status }}
+    steps:
+      - name: Checkout current Phase 9I revision
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          python -m pip install "scikit-learn>=1.5" pyarrow scipy statsmodels
+
+      - name: Resolve immutable current 2026 source commit
+        id: source
+        env:
+          REQUESTED_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          set -euo pipefail
+          if [ -n "${REQUESTED_COMMIT}" ]; then
+            SOURCE_COMMIT="${REQUESTED_COMMIT}"
+          else
+            SOURCE_COMMIT="$(curl -sS --fail --retry 3 "https://api.github.com/repos/${FRESH_SOURCE_REPO}/commits?path=NIFTY50-INDEX.parquet&per_page=1" | python -c 'import json,sys; print(json.load(sys.stdin)[0]["sha"])')"
+          fi
+          python - <<'PY' "${SOURCE_COMMIT}"
+          import re, sys
+          sha = sys.argv[1]
+          if not re.fullmatch(r"[0-9a-f]{40}", sha):
+              raise SystemExit(f"Invalid source commit SHA: {sha!r}")
+          print(f"Using immutable source commit {sha}")
+          PY
+          echo "commit=${SOURCE_COMMIT}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache source and prepared data
+        uses: actions/cache@v4
+        with:
+          path: data/phase9i
+          key: cpr-phase9i-data-${{ runner.os }}-${{ steps.source.outputs.commit }}
+          restore-keys: |
+            cpr-phase9i-data-${{ runner.os }}-
+
+      - name: Materialize immutable source snapshot
+        run: |
+          set -euo pipefail
+          mkdir -p data/phase9i/raw
+          SOURCE_FILE="data/phase9i/raw/NIFTY50-INDEX-${{ steps.source.outputs.commit }}.parquet"
+          if [ ! -f "$SOURCE_FILE" ]; then
+            curl -L --fail --retry 5 \
+              "https://raw.githubusercontent.com/${FRESH_SOURCE_REPO}/${{ steps.source.outputs.commit }}/NIFTY50-INDEX.parquet" \
+              -o "$SOURCE_FILE"
+          fi
+          echo "SOURCE_FILE=$SOURCE_FILE" >> "$GITHUB_ENV"
+
+      - name: Hash immutable source snapshot
+        id: source_sha
+        run: |
+          set -euo pipefail
+          SOURCE_SHA256="$(sha256sum "$SOURCE_FILE" | cut -d' ' -f1)"
+          echo "sha256=${SOURCE_SHA256}" >> "$GITHUB_OUTPUT"
+          echo "Fresh source SHA256: ${SOURCE_SHA256}"
+
+      - name: Prepare pinned Phase 5A reference data
+        run: |
+          set -euo pipefail
+          mkdir -p data/phase9i/reference
+          if [ ! -f data/phase9i/reference/reference.csv ]; then
+            curl -L --fail --retry 5 \
+              "${REFERENCE_URL_BASE}/${REFERENCE_COMMIT}/nifty50_candlestick_data.csv" \
+              -o data/phase9i/reference/reference.csv
+          fi
+          if [ ! -f data/phase9i/reference/reference_5m.csv ]; then
+            python scripts/prepare_reference_nifty.py \
+              --input data/phase9i/reference/reference.csv \
+              --output data/phase9i/reference/reference_5m.csv
+          fi
+
+      - name: Rebuild and verify frozen frontier
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/frontier
+          mkdir -p artifacts/frontier
+          python scripts/run_cpr_regime_discovery.py \
+            --input data/phase9i/reference/reference_5m.csv \
+            --output-dir artifacts/frontier
+          FRONTIER_SHA="$(sha256sum artifacts/frontier/regime_discovery_train_pareto.csv | cut -d' ' -f1)"
+          test "$FRONTIER_SHA" = "${FROZEN_FRONTIER_SHA256}"
+          python - <<'PY'
+          import pandas as pd
+          p = "artifacts/frontier/regime_discovery_train_pareto.csv"
+          n = len(pd.read_csv(p))
+          if n != 39:
+              raise SystemExit(f"Expected 39 frozen frontier candidates, found {n}")
+          print(f"Frozen frontier verified: {n} candidates")
+          PY
+
+      - name: Prepare current fresh 2026 dataset
+        run: |
+          set -euo pipefail
+          mkdir -p data/phase9i/current
+          FRESH_OUTPUT="data/phase9i/current/fresh_5m-${{ steps.source.outputs.commit }}.csv"
+          if [ ! -f "$FRESH_OUTPUT" ]; then
+            python scripts/prepare_phase9i_current_nifty.py \
+              --input "$SOURCE_FILE" \
+              --output "$FRESH_OUTPUT" \
+              --source-commit "${{ steps.source.outputs.commit }}"
+          fi
+          echo "FRESH_OUTPUT=$FRESH_OUTPUT" >> "$GITHUB_ENV"
+
+      - name: Static validation of Phase 9I implementation
+        run: |
+          python -m py_compile \
+            scripts/prepare_phase9i_current_nifty.py \
+            scripts/run_phase9i_prospective_validation.py \
+            scripts/run_phase9g_frontier_consensus_validation.py \
+            scripts/run_phase9h_economic_strategy_validation.py
+
+      - name: Run Phase 9I
+        id: evaluate
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/phase9i
+          mkdir -p artifacts/phase9i
+          python scripts/run_phase9i_prospective_validation.py \
+            --reference data/phase9i/reference/reference_5m.csv \
+            --fresh "$FRESH_OUTPUT" \
+            --frontier artifacts/frontier/regime_discovery_train_pareto.csv \
+            --source-commit "${{ steps.source.outputs.commit }}" \
+            --source-sha256 "${{ steps.source_sha.outputs.sha256 }}" \
+            --output-dir artifacts/phase9i
+          STATUS="$(python -c 'import json; print(json.load(open("artifacts/phase9i/phase9i_run_state.json"))["status"])')"
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+          echo "Phase 9I status: ${STATUS}"
+
+      - name: Create human-readable status
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/phase9i
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import pandas as pd
+
+          out = Path("artifacts/phase9i")
+          state = json.loads((out / "phase9i_run_state.json").read_text()) if (out / "phase9i_run_state.json").exists() else {"status":"WORKFLOW_ERROR"}
+          prov = pd.read_csv(out / "phase9i_provenance.csv") if (out / "phase9i_provenance.csv").exists() else pd.DataFrame()
+          lines = [
+              "# Phase 9I Latest Run",
+              "",
+              f"- Workflow run: ${{ github.run_id }}",
+              f"- Git SHA: ${{ github.sha }}",
+              f"- Source commit: {prov.iloc[0]['source_commit'] if len(prov) else '${{ steps.source.outputs.commit }}'}",
+              f"- Source SHA256: {prov.iloc[0]['source_sha256'] if len(prov) else '${{ steps.source_sha.outputs.sha256 }}'}",
+              f"- Status: **{state.get('status','WORKFLOW_ERROR')}**",
+              f"- Fresh data end: {state.get('fresh_data_end','unknown')}",
+              f"- Completed event trades: {state.get('completed_event_trades',0)}",
+              f"- Completed non-overlap portfolio trades: {state.get('completed_portfolio_trades',0)}",
+              f"- Pending signals: {state.get('pending_signals',0)}",
+              "",
+              "The candidate is frozen and no refitting/re-selection is performed.",
+          ]
+          (out / "status.md").write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+          PY
+          cat artifacts/phase9i/status.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate required Phase 9I outputs
+        if: success()
+        run: |
+          set -euo pipefail
+          for f in \
+            phase9i_provenance.csv \
+            phase9i_completed_event_trades.csv \
+            phase9i_pending_signals.csv \
+            phase9i_event_summary.csv \
+            phase9i_portfolio_trades.csv \
+            phase9i_portfolio_summary.csv \
+            phase9i_run_state.json; do
+            test -s "artifacts/phase9i/$f"
+          done
+
+      - name: Publish workflow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpr-phase9i-prospective-validation-${{ github.run_id }}
+          path: |
+            artifacts/phase9i/*
+            artifacts/frontier/regime_discovery_train_pareto.csv
+
+      - name: Persist Phase 9I state to repository
+        if: success()
+        run: |
+          set -euo pipefail
+          mkdir -p docs/phase9i/data
+          cp artifacts/phase9i/phase9i_provenance.csv docs/phase9i/data/latest_provenance.csv
+          cp artifacts/phase9i/phase9i_completed_event_trades.csv docs/phase9i/data/latest_completed_event_trades.csv
+          cp artifacts/phase9i/phase9i_pending_signals.csv docs/phase9i/data/latest_pending_signals.csv
+          cp artifacts/phase9i/phase9i_event_summary.csv docs/phase9i/data/latest_event_summary.csv
+          cp artifacts/phase9i/phase9i_portfolio_trades.csv docs/phase9i/data/latest_portfolio_trades.csv
+          cp artifacts/phase9i/phase9i_portfolio_summary.csv docs/phase9i/data/latest_portfolio_summary.csv
+          cp artifacts/phase9i/phase9i_run_state.json docs/phase9i/data/latest_run_state.json
+          cp artifacts/phase9i/status.md docs/phase9i/latest_status.md
+
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import csv
+          state = json.loads(Path("docs/phase9i/data/latest_run_state.json").read_text())
+          with Path("docs/phase9i/data/latest_provenance.csv").open(encoding="utf-8") as src:
+              row = next(csv.DictReader(src), {})
+          log = Path("docs/phase9i/run_log.md")
+          with log.open("a", encoding="utf-8") as f:
+              f.write("\\n## ${{ github.run_started_at }} — workflow run ${{ github.run_id }}\\n\\n")
+              f.write(f"- Git SHA: ${{ github.sha }}\\n")
+              f.write(f"- Source commit: {row.get('source_commit','unknown')}\\n")
+              f.write(f"- Source SHA256: {row.get('source_sha256','unknown')}\\n")
+              f.write(f"- Status: **{state.get('status')}**\\n")
+              f.write(f"- Completed event trades: {state.get('completed_event_trades',0)}\\n")
+              f.write(f"- Completed non-overlap portfolio trades: {state.get('completed_portfolio_trades',0)}\\n")
+              f.write(f"- Pending signals: {state.get('pending_signals',0)}\\n")
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/phase9i
+          if git diff --cached --quiet; then
+            echo "No Phase 9I repository-state changes to commit."
+          else
+            git commit -m "Phase 9I: persist prospective validation state"
+            git push
+          fi
+
+      - name: Log workflow failure
+        if: failure()
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          log = Path("docs/CPR_ERROR_LOG.md")
+          with log.open("a", encoding="utf-8") as f:
+              f.write("\\n## ${{ github.run_started_at }} — Phase 9I workflow failure\\n\\n")
+              f.write("- Classification: **implementation/execution failure until inspected; not a scientific result**\\n")
+              f.write("- Workflow run: ${{ github.run_id }}\\n")
+              f.write("- Git SHA: ${{ github.sha }}\\n")
+              f.write("- Source resolution is retained in workflow logs when available.\\n")
+              f.write("- Scientific hypothesis changed: **NO unless explicitly re-registered later**.\\n")
+              f.write("- 2026 selection/refitting: **NO**.\\n")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/CPR_ERROR_LOG.md
+          if git diff --cached --quiet; then
+            echo "No error-log changes to commit."
+          else
+            git commit -m "Phase 9I: log workflow failure"
+            git push
+          fi
