@@ -84,3 +84,15 @@ The 30–40% monthly objective is a scenario to quantify, not a presumed propert
 ## Latest research status
 
 **Phase 9I active.** The first verified scientific execution is workflow **35468434477** with artifact **10592625047**. The frozen candidate **LEAF_4 / SHORT / 10-session swing / ATR 1R stop + 2R target** currently has **0 completed new trades** because the verified source ends at 17-Sep-2026 15:25 Asia/Kolkata, before the hard 15:30 cutoff. This is a data-readiness state, not a strategy result. No refitting or 2026 re-selection is permitted. The workflow now resolves an immutable source commit, caches inputs by SHA, reuses the verified frozen frontier, and persistently updates the research state. See `docs/CPR_PHASE9I_PROTOCOL.md`, `docs/CPR_PHASE9I_STATUS.md` and `docs/CPR_CONTINUITY_CHECKPOINT.md`.
+
+
+## GitHub Pages — prospective validation dashboard
+
+The active Phase 9I prospective-validation state is automatically published to GitHub Pages:
+
+**https://vishnuvcr.github.io/CPR-/**
+
+The dashboard is rebuilt from the persisted `docs/phase9i/` state after Phase 9I updates and can also be run manually through the Pages workflow. It exposes the latest run state, provenance, completed trades, pending signals, summaries, protocol, run log, and continuity checkpoint.
+
+Setup/provenance: `docs/CPR_GITHUB_PAGES_SETUP.md`  
+Pages workflow: `.github/workflows/cpr-phase9i-pages.yml`
