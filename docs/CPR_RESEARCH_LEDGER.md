@@ -38,10 +38,10 @@
 
 **Current phase:** **9H — Economic / Strategy-Conditional Validation**
 
-**Current status:** IN PROGRESS — Phase 9H Run #1 failed due a simulator-feature implementation bug; corrected code is committed and Run #2 is the verification rerun.
+**Current status:** IN PROGRESS — Phase 9H Run #2 failed due a timezone-handling implementation bug in cost calculation; corrected code is committed as `5f2e7e8f3155db973193e0f73a7429a2f6cf51a6`, and the failed run is classified as implementation-only. A rerun is required before any scientific interpretation.
 
 Latest active branch:
-`cpr-v1.0-phase9g-frontier-consensus-validation`
+`cpr-v1.0-phase9h-economic-strategy-validation`
 
 Latest active Phase 9G workflow:
 - Run #4 (successful): **35456904514**
@@ -645,3 +645,13 @@ If this file conflicts with recollection from a conversation, **the repository e
 ## 20. Phase 9H Run #1 failure
 
 Workflow run: 35457500756. Preparation, frozen frontier verification, Phase 7 and 2026 data preparation all passed. The simulator produced zero strategy observations because `D_ATR20` existed in the event-generation feature frame but was not attached to the raw OHLCV frame used by the simulator. This was an implementation error only; no scientific output was generated. Correction: the simulator now receives a featured bar frame containing `D_ATR20`, with an explicit invariant that the feature must exist. Run #2 is the verification rerun.
+
+
+## 21. Latest Phase 9H execution checkpoint — 2026-09-19
+
+- Branch: `cpr-v1.0-phase9h-economic-strategy-validation`
+- Run #2: **35458024849 — failed** during `cost_roundtrip()` because a timezone-aware trade date was compared with a timezone-naive statutory-rate cutoff.
+- Classification: implementation-only; **no scientific result** and **no 2026 selection** occurred.
+- Fix commit: `5f2e7e8f3155db973193e0f73a7429a2f6cf51a6`.
+- Required next action: rerun Phase 9H, then inspect every artifact before recording scientific results or opening the next phase.
+- User continuity instruction recorded: continue routine debugging automatically, do not stop midway unless serious intervention is required; before each next research step, read this ledger and the error log.
