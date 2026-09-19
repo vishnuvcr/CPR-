@@ -1,5 +1,6 @@
 name: CPR Phase 9H Economic Strategy Validation
 
+# Research-control note: push/manual runs must execute the current phase-branch revision.\n
 on:
   workflow_dispatch:
   push:
