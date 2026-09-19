@@ -47,3 +47,13 @@
 - Scientific hypothesis changed: **NO**.
 - 2026 selection: **NO**.
 - Follow-up: rerun Phase 9H after the patch and inspect all generated artifacts before interpretation.
+
+## 2026-09-19 — Phase 9H rerun attempt after Run #2 fix
+
+- Workflow run ID: 35458024849 (rerun of failed job)
+- Classification: **execution/reproducibility issue; not a scientific result**
+- Observed: the rerun executed the original failing revision, so it repeated the pre-fix timezone error even though the corrected file had already been committed separately.
+- Cause: GitHub Actions job rerun reused the original run revision rather than the newer corrective commit.
+- Correction: hardened the timezone-normalization implementation and created a new commit `6f1c403dda9046e3787de0fc599bba4d3d53b56c`; the push trigger on the phase branch will execute the corrected revision.
+- Scientific hypothesis changed: **NO**.
+- 2026 selection: **NO**.
