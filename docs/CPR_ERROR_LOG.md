@@ -100,3 +100,19 @@
 - Holdout policy changed: **NO**.
 - 2026 selection/refitting: **NO**.
 - Status: **CLOSED before first scientific Phase 9I run**.
+
+## 2026-09-20 — Phase 9I Run #1 repository persistence failure
+
+- Workflow run: **35467969660**
+- Classification: **execution/reproducibility issue; not a scientific result**
+- Scientific evaluation itself completed successfully with status `INSUFFICIENT_NEW_HOLDOUT`.
+- Failure point: repository persistence step.
+- Cause: the workflow checkout was at commit `191268535f328bd792a77f3e64f23f2b6e218b49`, while the branch had advanced before the push because a concurrent Phase 9I emergency-runner workflow file commit landed on the same branch. Git rejected the push with `fetch first`.
+- The attempted failure-log push also hit the same stale-branch condition.
+- Artifact **10592206097** was independently downloaded and inspected; digest `sha256:d21c78a63788286f1ad7c3524316bcfdb44e6b37eea8aa8d589daf6c70a19739`.
+- Correction: Phase 9I persistence was hardened to fetch and reset to the latest remote branch before copying/persisting state; the frozen frontier is now reused from the already-verified repository artifact rather than rebuilt on every run.
+- Scientific hypothesis changed: **NO**.
+- Candidate parameters changed: **NO**.
+- Holdout policy changed: **NO**.
+- 2026 selection/refitting: **NO**.
+- Status: **CLOSED** after successful Run #2.
