@@ -619,3 +619,8 @@ Every future phase should store:
 If this file conflicts with recollection from a conversation, **the repository evidence wins** unless a newer verified commit/run explicitly supersedes it.
 
 ---
+
+
+## 17. Ledger establishment event
+
+**2026-09-19:** Canonical cross-chat continuity ledger established after the user reported continuity loss between chats. The repository README was updated to require reading this ledger before every new research step. The ledger now records phase lineage, workflow/run IDs, scientific decisions, implementation failures/fixes, current gates, and research-relevant chat decisions. Future updates must be made before advancing to another phase.
