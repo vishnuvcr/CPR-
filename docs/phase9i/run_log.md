@@ -10,3 +10,11 @@ This is the persistent, factual execution log for the prospective validation pha
 - 2026 selection/refitting: NO
 - Expected behavior before sufficient new data: status may be `INSUFFICIENT_NEW_HOLDOUT`
 - Workflow: `.github/workflows/cpr-phase9i-prospective-validation.yml`
+
+
+## 2026-09-20 — Pre-run validation correction
+
+- Found before first scientific run: incorrect call signature to the frozen tree-construction helper.
+- Corrected in commit `a24991d5c7934fdcc7bf3baad08628a66868c241`.
+- No data, candidate, cutoff, cost or statistical rule changed.
+- First scientific workflow run remains pending.
