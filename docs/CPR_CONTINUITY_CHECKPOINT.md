@@ -1,6 +1,6 @@
 # CPR Research Continuity Checkpoint
 
-**Last verified phase:** 9I initiated  
+**Last verified phase:** 9I active — first execution verified  
 **Branch:** `cpr-v1.0-phase9i-prospective-validation`  
 **Parent verified phase:** 9H — workflow 35459389390 SUCCESS, artifact 10589707833
 
@@ -21,8 +21,10 @@
 2. Phase 9I branch created: DONE.
 3. Phase 9I protocol/status/script/run-log created: DONE.
 4. Canonical plan, error log and README updated: DONE.
-5. Phase 9I workflow execution: PENDING FIRST RUN.
-6. On every new run, inspect the workflow status, source provenance, artifacts and `docs/phase9i/run_log.md` before interpretation.
+5. First Phase 9I scientific execution: **35467969660 completed scientifically; repository persistence failed due stale checkout, then was corrected and logged.**
+6. Verification Run #2: **35468434477 SUCCESS**, artifact 10592625047 inspected; state is `INSUFFICIENT_NEW_HOLDOUT`.
+7. Workflow persistence hardened and frozen-frontier reuse optimized: DONE.
+8. On every new run, inspect the workflow status, source provenance, artifacts and `docs/phase9i/run_log.md` before interpretation.
 
 ## Recovery rule
 
