@@ -35,3 +35,15 @@
 - Added invariant: fail early if the featured bar frame lacks `D_ATR20`.
 - Scientific hypothesis changed: NO.
 - 2026 selection: NO.
+
+## 2026-09-19 — Phase 9H Run #2 failure
+
+- Workflow run ID: 35458024849
+- Classification: **implementation error; not a scientific result**
+- Failure point: `cost_roundtrip()` in `scripts/run_phase9h_economic_strategy_validation.py`
+- Error: `TypeError: Cannot compare tz-naive and tz-aware timestamps`
+- Cause: trade dates derived from timezone-aware Asia/Kolkata bar indices were compared directly with a timezone-naive 2026-04-01 cutoff.
+- Correction: normalize the trade timestamp to timezone-naive before the date comparison; no price, event, holdout, strategy, or cost rule was changed.
+- Scientific hypothesis changed: **NO**.
+- 2026 selection: **NO**.
+- Follow-up: rerun Phase 9H after the patch and inspect all generated artifacts before interpretation.
