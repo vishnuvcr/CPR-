@@ -1,0 +1,12 @@
+{
+  "status": "INSUFFICIENT_NEW_HOLDOUT",
+  "completed_event_trades": 0,
+  "completed_portfolio_trades": 0,
+  "pending_signals": 0,
+  "fresh_data_end": "2026-09-17 15:25:00+05:30",
+  "cutoff": "2026-09-17 15:30:00+05:30",
+  "maturity_rule": {
+    "min_trades": 30,
+    "calendar_days": 90
+  }
+}
