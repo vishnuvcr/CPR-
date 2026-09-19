@@ -36,18 +36,19 @@
 
 **Date:** 2026-09-19 (Asia/Kolkata)
 
-**Current phase:** **9G — Frozen frontier-only consensus validation**
+**Current phase:** **9H — Economic / Strategy-Conditional Validation (next phase)**
 
-**Current status:** Run #3 FAILED (implementation error); correction committed, rerun required.
+**Current status:** Phase 9G COMPLETE; consensus layer not promoted. Phase 9H branch is being prepared.
 
 Latest active branch:
 `cpr-v1.0-phase9g-frontier-consensus-validation`
 
 Latest active Phase 9G workflow:
-- Run: **#3 (failed)**
-- Run ID: **35390742248**
-- Commit: `e0f44cf8d6eabda496195fcf0753a009084119ca`
-- Failure: NumPy array incorrectly treated as pandas Series in `assign_frontier_regime()` (`.isin` AttributeError).
+- Run #4 (successful): **35456904514**
+- Commit: `aee98cf17f8f5d141cdd8d5f6f014505fc890944`
+- Artifact ID: **10588955161**
+- Artifact digest: `sha256:59f975772c315f0a7d698e92ec135c406b515995878a760c04b60a9281be7d84`
+- Prior Run #3 failure corrected: NumPy array incorrectly treated as pandas Series in `assign_frontier_regime()`.
 - URL: https://github.com/vishnuvcr/CPR-/actions/runs/35390742248
 
 The latest 9G run was started after correcting a shell-quoting failure in the Phase 7 dataset download step. At the point of this ledger update, the run status is still being monitored; **no 9G scientific conclusion is recorded yet**.
@@ -105,7 +106,7 @@ Before any Phase 9G result interpretation or Phase 10/next-phase creation:
 **Status:** COMPLETE — regime × consensus interaction, including all frozen tree leaves.
 
 ### Phase 9G
-**Status:** IN PROGRESS — Run #3 failed due an implementation error; correction is being applied and a new run will verify the frontier-only analysis.
+**Status:** COMPLETE — frontier-only consensus validation found no replicated incremental consensus information; consensus is not promoted into the economic decision engine.
 
 ---
 
@@ -473,6 +474,7 @@ Those errors were corrected.
 | #1 | 9G | 35390362965 | FAIL | bad Phase 7 URL |
 | #2 | 9G | 35390384998 | FAIL | shell quoting |
 | #3 | 9G | 35390742248 | FAIL | NumPy array `.isin` implementation error; no scientific output produced |
+| #4 | 9G | 35456904514 | COMPLETE | Frontier-only consensus validation; no replicated incremental information |
 
 Full workflow logs remain available through the corresponding GitHub Actions pages. The ledger records the scientific-relevant conclusions and the reason each implementation failure occurred.
 
@@ -512,7 +514,7 @@ Consensus count was found to be context-dependent rather than a simple confidenc
 Regime × consensus interaction was promising as a scientific hypothesis but contaminated by heterogeneous `OTHER_FROZEN_TREE_LEAF` observations, motivating 9G.
 
 ### Current continuation instruction
-The user requested that the repository itself become the canonical memory, specifically because moving to new chats can lose continuity. Therefore this ledger is now the authoritative checkpoint.
+The user requested autonomous continuation without stopping midway for ordinary implementation errors. Therefore the workflow should rectify routine errors automatically, log them, rerun, and continue until the next serious research gate. The repository ledger remains the authoritative checkpoint.
 
 ---
 
@@ -539,12 +541,16 @@ Reason: Phase 9E did not show monotonic, replicated improvement from SINGLE to M
 Reason: Phase 9F found some statistically interesting interactions, but several were located outside named frontier leaves and/or reversed in 2026.
 
 ### D-006 — Named frontier-only validation required
-**Status:** ACTIVE  
-Reason: Phase 9G removes heterogeneous OTHER leaves before any strategy architecture is designed.
+**Status:** SATISFIED / COMPLETE
+Reason: Phase 9G removed heterogeneous OTHER leaves and completed the pre-specified validation.
 
 ### D-009 — Phase 9G Run #3 failure classified as implementation-only
-**Status:** ACTIVE  
-Reason: the failure occurred after both OOS datasets and the frozen frontier were prepared; no scientific result was generated.
+**Status:** CLOSED
+Reason: Run #4 successfully reproduced the full analysis after the NumPy membership fix.
+
+### D-010 — Consensus not promoted into downstream economic decision engine
+**Status:** ACTIVE
+Reason: Phase 9G produced no FDR-significant incremental SINGLE-vs-MULTIPLE result and no matched Phase 7-to-2026 sign replication.
 
 ### D-007 — 2026 remains untouched
 **Status:** LOCKED  
