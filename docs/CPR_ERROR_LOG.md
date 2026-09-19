@@ -68,3 +68,10 @@
 - Scientific hypothesis changed: **NO**.
 - 2026 selection: **NO**.
 - Follow-up: rerun the fallback workflow against the corrected current Phase 9H branch and inspect artifacts.
+
+## 2026-09-19 — Phase 9H successful completion
+
+- Corrected fallback workflow 35459389390 completed successfully.
+- The earlier Run #1 ATR feature bug, stale-revision rerun issue, and malformed source patch are closed as implementation errors.
+- Artifact 10589707833 was generated and inspected.
+- No scientific errors were identified in the final successful run.
