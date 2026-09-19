@@ -38,7 +38,7 @@
 
 **Current phase:** **9H — Economic / Strategy-Conditional Validation**
 
-**Current status:** IN PROGRESS — protocol, strategy evaluator and manual workflow are implemented; first workflow run is expected from the latest branch commit.
+**Current status:** IN PROGRESS — Phase 9H Run #1 failed due a simulator-feature implementation bug; corrected code is committed and Run #2 is the verification rerun.
 
 Latest active branch:
 `cpr-v1.0-phase9g-frontier-consensus-validation`
@@ -640,3 +640,8 @@ If this file conflicts with recollection from a conversation, **the repository e
 ## 18. Latest verified execution event
 
 **2026-09-19:** Phase 9G Run #3 was inspected directly. Data preparation and frozen-frontier verification passed; the analysis failed because `DecisionTreeClassifier.apply()` returned a NumPy array and the code called pandas `.isin()`. Error logged in `docs/CPR_ERROR_LOG.md`. Correction is implementation-only; rerun is required before any scientific interpretation.
+
+
+## 20. Phase 9H Run #1 failure
+
+Workflow run: 35457500756. Preparation, frozen frontier verification, Phase 7 and 2026 data preparation all passed. The simulator produced zero strategy observations because `D_ATR20` existed in the event-generation feature frame but was not attached to the raw OHLCV frame used by the simulator. This was an implementation error only; no scientific output was generated. Correction: the simulator now receives a featured bar frame containing `D_ATR20`, with an explicit invariant that the feature must exist. Run #2 is the verification rerun.
