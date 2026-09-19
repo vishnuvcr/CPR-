@@ -79,3 +79,8 @@ The 30–40% monthly objective is a scenario to quantify, not a presumed propert
 ## Continuity / read-first rule
 
 **Before any new research step, read `docs/CPR_RESEARCH_LEDGER.md` first.** It is the canonical cross-chat project state and records phase status, workflow IDs, artifacts, errors/fixes, methodological decisions, and the current next-step gate. Do not reconstruct the research state from memory when the ledger is available.
+
+
+## Latest research status
+
+**Phase 9H complete.** Economic/strategy validation found no deployable trading strategy yet. A frozen research candidate for prospective validation is **LEAF_4 / SHORT / 10-session swing / ATR 1R stop + 2R target**. Its Phase-7 independent bootstrap interval still includes zero, so it is not promoted to paper/live trading. See `docs/CPR_PHASE9H_RESULT.md` and `docs/CPR_CONTINUITY_CHECKPOINT.md`.
