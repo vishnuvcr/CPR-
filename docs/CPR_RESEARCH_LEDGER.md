@@ -36,9 +36,9 @@
 
 **Date:** 2026-09-19 (Asia/Kolkata)
 
-**Current phase:** **9H — Economic / Strategy-Conditional Validation (next phase)**
+**Current phase:** **9H — Economic / Strategy-Conditional Validation**
 
-**Current status:** Phase 9G COMPLETE; consensus layer not promoted. Phase 9H branch is being prepared.
+**Current status:** IN PROGRESS — protocol, strategy evaluator and manual workflow are implemented; first workflow run is expected from the latest branch commit.
 
 Latest active branch:
 `cpr-v1.0-phase9g-frontier-consensus-validation`
