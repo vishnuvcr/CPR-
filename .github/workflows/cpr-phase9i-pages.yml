@@ -1,0 +1,84 @@
+name: CPR Phase 9I GitHub Pages Dashboard
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "CPR Phase 9I Prospective Chronological Validation"
+    types:
+      - completed
+  schedule:
+    - cron: "30 13 * * 1-5"
+
+concurrency:
+  group: cpr-phase9i-pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    if: \${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout published Phase 9I state
+        uses: actions/checkout@v4
+        with:
+          ref: cpr-v1.0-phase9i-prospective-validation
+          fetch-depth: 1
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Assemble dashboard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s site/index.html
+          test -s docs/phase9i/data/latest_run_state.json
+
+          rm -rf _site
+          mkdir -p _site/data _site/docs
+
+          cp -R site/. _site/
+          cp -R docs/phase9i/data/. _site/data/
+          cp docs/phase9i/latest_status.md _site/latest_status.md
+          cp docs/phase9i/run_log.md _site/docs/phase9i-run-log.md
+          cp docs/CPR_PHASE9I_PROTOCOL.md _site/docs/CPR_PHASE9I_PROTOCOL.md
+          cp docs/CPR_PHASE9I_STATUS.md _site/docs/CPR_PHASE9I_STATUS.md
+          cp docs/CPR_CONTINUITY_CHECKPOINT.md _site/docs/CPR_CONTINUITY_CHECKPOINT.md
+          cp docs/CPR_RESEARCH_LEDGER.md _site/docs/CPR_RESEARCH_LEDGER.md
+          touch _site/.nojekyll
+
+      - name: Validate dashboard payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s _site/index.html
+          test -s _site/data/latest_run_state.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          state = json.loads(Path("_site/data/latest_run_state.json").read_text())
+          required = ["status", "fresh_data_end"]
+          missing = [k for k in required if k not in state]
+          if missing:
+              raise SystemExit(f"Missing dashboard state fields: {missing}")
+          print("Dashboard payload OK:", state.get("status"))
+          PY
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
