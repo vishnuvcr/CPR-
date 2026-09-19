@@ -1,0 +1,66 @@
+name: CPR Phase 9I GitHub Pages Dashboard
+
+on:
+  push:
+    branches:
+      - cpr-v1.0-phase9i-prospective-validation
+    paths:
+      - "docs/phase9i/**"
+      - "docs/CPR_PHASE9I_PROTOCOL.md"
+      - "docs/CPR_PHASE9I_STATUS.md"
+      - "docs/CPR_CONTINUITY_CHECKPOINT.md"
+      - "docs/CPR_RESEARCH_LEDGER.md"
+      - "site/**"
+      - ".github/workflows/cpr-phase9i-pages.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: cpr-phase9i-pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout Phase 9I branch
+        uses: actions/checkout@v4
+        with:
+          ref: cpr-v1.0-phase9i-prospective-validation
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Assemble dashboard
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site/data _site/docs
+
+          cp -R site/. _site/
+          cp -R docs/phase9i/data/. _site/data/
+          cp docs/phase9i/latest_status.md _site/latest_status.md
+          cp docs/phase9i/run_log.md _site/docs/phase9i-run-log.md
+          cp docs/CPR_PHASE9I_PROTOCOL.md _site/docs/CPR_PHASE9I_PROTOCOL.md
+          cp docs/CPR_PHASE9I_STATUS.md _site/docs/CPR_PHASE9I_STATUS.md
+          cp docs/CPR_CONTINUITY_CHECKPOINT.md _site/docs/CPR_CONTINUITY_CHECKPOINT.md
+          cp docs/CPR_RESEARCH_LEDGER.md _site/docs/CPR_RESEARCH_LEDGER.md
+          touch _site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
