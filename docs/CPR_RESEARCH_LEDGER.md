@@ -38,15 +38,16 @@
 
 **Current phase:** **9G — Frozen frontier-only consensus validation**
 
-**Current status:** RUNNING / NOT YET INTERPRETED.
+**Current status:** Run #3 FAILED (implementation error); correction committed, rerun required.
 
 Latest active branch:
 `cpr-v1.0-phase9g-frontier-consensus-validation`
 
 Latest active Phase 9G workflow:
-- Run: **#3**
+- Run: **#3 (failed)**
 - Run ID: **35390742248**
 - Commit: `e0f44cf8d6eabda496195fcf0753a009084119ca`
+- Failure: NumPy array incorrectly treated as pandas Series in `assign_frontier_regime()` (`.isin` AttributeError).
 - URL: https://github.com/vishnuvcr/CPR-/actions/runs/35390742248
 
 The latest 9G run was started after correcting a shell-quoting failure in the Phase 7 dataset download step. At the point of this ledger update, the run status is still being monitored; **no 9G scientific conclusion is recorded yet**.
@@ -104,7 +105,7 @@ Before any Phase 9G result interpretation or Phase 10/next-phase creation:
 **Status:** COMPLETE — regime × consensus interaction, including all frozen tree leaves.
 
 ### Phase 9G
-**Status:** RUNNING — frontier-only regime × consensus validation; excludes heterogeneous `OTHER_FROZEN_TREE_LEAF` observations and adds stratified CMH testing.
+**Status:** IN PROGRESS — Run #3 failed due an implementation error; correction is being applied and a new run will verify the frontier-only analysis.
 
 ---
 
@@ -471,7 +472,7 @@ Those errors were corrected.
 | #4 | 9F | 35388737698 | COMPLETE | regime × consensus |
 | #1 | 9G | 35390362965 | FAIL | bad Phase 7 URL |
 | #2 | 9G | 35390384998 | FAIL | shell quoting |
-| #3 | 9G | 35390742248 | RUNNING at ledger creation | frontier-only analysis |
+| #3 | 9G | 35390742248 | FAIL | NumPy array `.isin` implementation error; no scientific output produced |
 
 Full workflow logs remain available through the corresponding GitHub Actions pages. The ledger records the scientific-relevant conclusions and the reason each implementation failure occurred.
 
@@ -540,6 +541,10 @@ Reason: Phase 9F found some statistically interesting interactions, but several 
 ### D-006 — Named frontier-only validation required
 **Status:** ACTIVE  
 Reason: Phase 9G removes heterogeneous OTHER leaves before any strategy architecture is designed.
+
+### D-009 — Phase 9G Run #3 failure classified as implementation-only
+**Status:** ACTIVE  
+Reason: the failure occurred after both OOS datasets and the frozen frontier were prepared; no scientific result was generated.
 
 ### D-007 — 2026 remains untouched
 **Status:** LOCKED  
@@ -624,3 +629,8 @@ If this file conflicts with recollection from a conversation, **the repository e
 ## 17. Ledger establishment event
 
 **2026-09-19:** Canonical cross-chat continuity ledger established after the user reported continuity loss between chats. The repository README was updated to require reading this ledger before every new research step. The ledger now records phase lineage, workflow/run IDs, scientific decisions, implementation failures/fixes, current gates, and research-relevant chat decisions. Future updates must be made before advancing to another phase.
+
+
+## 18. Latest verified execution event
+
+**2026-09-19:** Phase 9G Run #3 was inspected directly. Data preparation and frozen-frontier verification passed; the analysis failed because `DecisionTreeClassifier.apply()` returned a NumPy array and the code called pandas `.isin()`. Error logged in `docs/CPR_ERROR_LOG.md`. Correction is implementation-only; rerun is required before any scientific interpretation.
