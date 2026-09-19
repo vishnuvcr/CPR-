@@ -115,7 +115,7 @@ def main():
         raise ValueError("Phase 9I fresh bars missing D_ATR20")
 
     events = make_events(fresh)
-    trees = frozen_trees(reference, frontier)
+    trees = frozen_trees(reference)
     parts = []
     for asset, ev in events.items():
         if ev.empty:
