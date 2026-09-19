@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CPR v1.0 — Prospective Validation Dashboard</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; max-width: 1180px; margin: 0 auto; padding: 24px; line-height: 1.5; }
+    h1, h2 { line-height: 1.2; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 12px; margin: 18px 0; }
+    .card { border: 1px solid #8884; border-radius: 12px; padding: 14px; background: #8881; }
+    .label { font-size: .8rem; opacity: .7; text-transform: uppercase; letter-spacing: .05em; }
+    .value { font-size: 1.15rem; font-weight: 650; margin-top: 4px; word-break: break-word; }
+    .notice { border-left: 4px solid #888; padding: 10px 14px; background: #8881; border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #8884; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; background: #8881; border-radius: 8px; }
+    a { color: inherit; }
+    .muted { opacity: .72; }
+    .status { font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>CPR v1.0 — Phase 9I</h1>
+  <p>Prospective chronological validation dashboard for the frozen economic candidate.</p>
+
+  <div class="notice">
+    <strong>Scientific lock:</strong>
+    no refitting, threshold changes, horizon changes, candidate reselection, or 2026 selection are performed during this prospective gate.
+  </div>
+
+  <div class="grid">
+    <div class="card"><div class="label">Status</div><div class="value status" id="status">Loading…</div></div>
+    <div class="card"><div class="label">Fresh data end</div><div class="value" id="fresh-end">Loading…</div></div>
+    <div class="card"><div class="label">Completed event trades</div><div class="value" id="event-trades">Loading…</div></div>
+    <div class="card"><div class="label">Completed portfolio trades</div><div class="value" id="portfolio-trades">Loading…</div></div>
+    <div class="card"><div class="label">Pending signals</div><div class="value" id="pending">Loading…</div></div>
+    <div class="card"><div class="label">Source commit</div><div class="value" id="source-commit">Loading…</div></div>
+  </div>
+
+  <h2>Frozen candidate</h2>
+  <p><strong>LEAF_4 / SHORT / 10-session swing / ATR 1R stop + 2R target</strong></p>
+  <p>Fresh-holdout cutoff: <strong>2026-09-17 15:30 Asia/Kolkata</strong>.</p>
+
+  <h2>Current run</h2>
+  <pre id="run-state">Loading…</pre>
+
+  <h2>Published research files</h2>
+  <table>
+    <thead><tr><th>Artifact</th><th>Link</th></tr></thead>
+    <tbody>
+      <tr><td>Latest run state</td><td><a href="data/latest_run_state.json">JSON</a></td></tr>
+      <tr><td>Latest provenance</td><td><a href="data/latest_provenance.csv">CSV</a></td></tr>
+      <tr><td>Completed event trades</td><td><a href="data/latest_completed_event_trades.csv">CSV</a></td></tr>
+      <tr><td>Completed portfolio trades</td><td><a href="data/latest_portfolio_trades.csv">CSV</a></td></tr>
+      <tr><td>Pending signals</td><td><a href="data/latest_pending_signals.csv">CSV</a></td></tr>
+      <tr><td>Event summary</td><td><a href="data/latest_event_summary.csv">CSV</a></td></tr>
+      <tr><td>Portfolio summary</td><td><a href="data/latest_portfolio_summary.csv">CSV</a></td></tr>
+      <tr><td>Human-readable latest status</td><td><a href="latest_status.md">Markdown</a></td></tr>
+      <tr><td>Phase 9I run log</td><td><a href="docs/phase9i-run-log.md">Markdown</a></td></tr>
+      <tr><td>Phase 9I protocol</td><td><a href="docs/CPR_PHASE9I_PROTOCOL.md">Markdown</a></td></tr>
+      <tr><td>Phase 9I status</td><td><a href="docs/CPR_PHASE9I_STATUS.md">Markdown</a></td></tr>
+      <tr><td>Continuity checkpoint</td><td><a href="docs/CPR_CONTINUITY_CHECKPOINT.md">Markdown</a></td></tr>
+      <tr><td>Master research ledger</td><td><a href="docs/CPR_RESEARCH_LEDGER.md">Markdown</a></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Interpretation guardrail</h2>
+  <p class="muted">
+    <span id="interpretation">Loading…</span>
+  </p>
+
+  <script>
+    async function load() {
+      const r = await fetch('data/latest_run_state.json', {cache: 'no-store'});
+      if (!r.ok) throw new Error('latest_run_state.json unavailable');
+      const s = await r.json();
+
+      document.getElementById('status').textContent = s.status ?? 'UNKNOWN';
+      document.getElementById('fresh-end').textContent = s.fresh_data_end ?? 'unknown';
+      document.getElementById('event-trades').textContent = s.completed_event_trades ?? 0;
+      document.getElementById('portfolio-trades').textContent = s.completed_portfolio_trades ?? 0;
+      document.getElementById('pending').textContent = s.pending_signals ?? 0;
+      document.getElementById('source-commit').textContent = s.source_commit ?? 'unknown';
+      document.getElementById('run-state').textContent = JSON.stringify(s, null, 2);
+
+      const status = String(s.status || '');
+      document.getElementById('interpretation').textContent =
+        status === 'INSUFFICIENT_NEW_HOLDOUT'
+          ? 'This is a data-readiness state: there are not yet enough genuinely new post-cutoff observations to evaluate the candidate. It is not a negative strategy result.'
+          : status === 'MATURED'
+            ? 'The pre-registered maturity gate has been reached. Review the full stored results and protocol before drawing the final scientific conclusion.'
+            : 'The latest stored state is shown above. Interpret only within the pre-registered Phase 9I protocol.';
+    }
+
+    load().catch(err => {
+      document.getElementById('status').textContent = 'PAGES DATA ERROR';
+      document.getElementById('run-state').textContent = String(err);
+    });
+  </script>
+</body>
+</html>
