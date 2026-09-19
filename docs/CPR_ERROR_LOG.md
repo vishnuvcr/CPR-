@@ -75,3 +75,14 @@
 - The earlier Run #1 ATR feature bug, stale-revision rerun issue, and malformed source patch are closed as implementation errors.
 - Artifact 10589707833 was generated and inspected.
 - No scientific errors were identified in the final successful run.
+
+
+## 2026-09-20 — Phase 9I initiation
+
+- Branch: `cpr-v1.0-phase9i-prospective-validation`
+- Classification: **phase initialization; no scientific result**
+- Fixed candidate: LEAF_4 / SHORT / 10-session / ATR 1R stop + 2R target.
+- Fresh holdout cutoff: 2026-09-17 15:30 Asia/Kolkata.
+- Important readiness rule: a run with insufficient post-cutoff data is recorded as `INSUFFICIENT_NEW_HOLDOUT`, not as a negative trading result.
+- Candidate/refit policy changed: **NO**.
+- 2026 re-selection: **NO**.
