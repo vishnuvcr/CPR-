@@ -715,3 +715,22 @@ Workflow run: 35457500756. Preparation, frozen frontier verification, Phase 7 an
 **Outputs:** `docs/phase9i/run_log.md` plus machine-readable provenance, completed events, pending signals, event summaries, portfolio summaries and run state.
 
 **Chat/session decision:** The user instructed autonomous continuation and automatic error correction. Phase 9I therefore uses scheduled/manual workflow execution with persistent run logs; routine implementation errors must be fixed and logged without altering the frozen hypothesis.
+
+## 26. Phase 9I first verified execution — 2026-09-20
+
+- Phase 9I scientific question: whether the frozen Phase 9H candidate survives a genuinely new chronological holdout after the Phase 8 cutoff.
+- Frozen candidate: **LEAF_4 / SHORT / 10-session swing / ATR 1R stop + 2R target**.
+- Hard cutoff: **2026-09-17 15:30 Asia/Kolkata**.
+- Run #1: **35467969660** completed scientific evaluation with `INSUFFICIENT_NEW_HOLDOUT`, but repository persistence failed because the workflow checkout was stale relative to the remote branch. This was classified as execution-only and logged.
+- Run #2: **35468434477 — SUCCESS** after persistence hardening; artifact **10592625047**, digest `sha256:28c25e0aacc1e0a242e3cf281c028609dbdf6ac011d5251f97d5b27e9a662b3e`.
+- Fresh source: commit `e8f19f3f53ca6fac0b116e83508e814e568dca54`, SHA256 `8861e062df4d1aa861120c2b1613f8b50e0de7d99fd89625066077e224a5aa5f`.
+- Fresh data end: **2026-09-17 15:25 Asia/Kolkata**.
+- Completed new candidate event trades: **0**.
+- Completed non-overlap portfolio trades: **0**.
+- Pending signals: **0**.
+- State: **INSUFFICIENT_NEW_HOLDOUT**.
+- Frozen frontier verified again: 39 leaves; SHA256 `601a72f5e64204aee7ff0bb77347d57b0e2b59871b8bc30011282c2dc02c28b2`.
+- No scientific parameters, cost rules, thresholds, horizons or candidate selection were changed.
+- 2026 re-selection/refitting: **NO**.
+- Interpretation: the prospective gate is correctly active but has not yet accumulated any new post-cutoff observations. No strategy verdict can be inferred from this readiness state.
+- Next automatic step: scheduled/manual Phase 9I reruns will resolve the latest immutable 2026 source commit, use the cached source by SHA, and update the persistent state when new observations become available.
