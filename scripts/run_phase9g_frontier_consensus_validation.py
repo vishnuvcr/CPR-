@@ -166,10 +166,11 @@ def assign_frontier_regime(pop, trees, frontier):
         ].leaf.astype(int))
         if tree is None:
             continue
-        leaves = tree.apply(q[FEATURES]).astype(int)
+        leaves = np.asarray(tree.apply(q[FEATURES]), dtype=int)
+        q = q.reset_index(drop=True).copy()
         q["regime_leaf"] = leaves
-        q = q[leaves.isin(allowed)].copy()
-        q["regime"] = [f"LEAF_{int(v)}" for v in q.regime_leaf]
+        q = q[np.isin(leaves, np.fromiter(allowed, dtype=int))].copy()
+        q["regime"] = q["regime_leaf"].map(lambda v: f"LEAF_{int(v)}")
         if not q.empty:
             parts.append(q)
     return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
