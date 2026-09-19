@@ -1,0 +1,125 @@
+name: CPR Phase 9I Emergency Runner
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  run-phase9i:
+    if: ${{ github.event.issue.pull_request == null && github.event.comment.body == '/run-cpr-phase9i' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Phase 9I branch
+        uses: actions/checkout@v4
+        with:
+          ref: cpr-v1.0-phase9i-prospective-validation
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          python -m pip install "scikit-learn>=1.5" pyarrow scipy statsmodels
+
+      - name: Resolve latest immutable 2026 source
+        run: |
+          set -euo pipefail
+          SOURCE_COMMIT="$(curl -sS --fail --retry 5 "https://api.github.com/repos/ganeshbiyer/Nse_Historical_Data_2026/commits?path=NIFTY50-INDEX.parquet&per_page=1" | python -c 'import json,sys; print(json.load(sys.stdin)[0]["sha"])')"
+          python - <<'PY' "$SOURCE_COMMIT"
+          import re, sys
+          if not re.fullmatch(r"[0-9a-f]{40}", sys.argv[1]):
+              raise SystemExit("Invalid source SHA")
+          PY
+          echo "SOURCE_COMMIT=$SOURCE_COMMIT" >> "$GITHUB_ENV"
+          mkdir -p data/phase9i/raw data/phase9i/current data/phase9i/reference
+          SOURCE_FILE="data/phase9i/raw/NIFTY50-INDEX-$SOURCE_COMMIT.parquet"
+          if [ ! -f "$SOURCE_FILE" ]; then
+            curl -L --fail --retry 5 "https://raw.githubusercontent.com/ganeshbiyer/Nse_Historical_Data_2026/$SOURCE_COMMIT/NIFTY50-INDEX.parquet" -o "$SOURCE_FILE"
+          fi
+          echo "SOURCE_FILE=$SOURCE_FILE" >> "$GITHUB_ENV"
+          echo "SOURCE_SHA256=$(sha256sum "$SOURCE_FILE" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+      - name: Prepare pinned reference and verify frontier
+        run: |
+          set -euo pipefail
+          if [ ! -f data/phase9i/reference/reference.csv ]; then
+            curl -L --fail --retry 5 "https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv" -o data/phase9i/reference/reference.csv
+          fi
+          if [ ! -f data/phase9i/reference/reference_5m.csv ]; then
+            python scripts/prepare_reference_nifty.py --input data/phase9i/reference/reference.csv --output data/phase9i/reference/reference_5m.csv
+          fi
+          rm -rf artifacts/frontier
+          mkdir -p artifacts/frontier
+          python scripts/run_cpr_regime_discovery.py --input data/phase9i/reference/reference_5m.csv --output-dir artifacts/frontier
+          test "$(sha256sum artifacts/frontier/regime_discovery_train_pareto.csv | cut -d' ' -f1)" = "601a72f5e64204aee7ff0bb77347d57b0e2b59871b8bc30011282c2dc02c28b2"
+
+      - name: Prepare fresh 2026 bars and run Phase 9I
+        run: |
+          set -euo pipefail
+          FRESH_OUTPUT="data/phase9i/current/fresh_5m-$SOURCE_COMMIT.csv"
+          if [ ! -f "$FRESH_OUTPUT" ]; then
+            python scripts/prepare_phase9i_current_nifty.py --input "$SOURCE_FILE" --output "$FRESH_OUTPUT" --source-commit "$SOURCE_COMMIT"
+          fi
+          python -m py_compile scripts/prepare_phase9i_current_nifty.py scripts/run_phase9i_prospective_validation.py
+          rm -rf artifacts/phase9i
+          mkdir -p artifacts/phase9i
+          python scripts/run_phase9i_prospective_validation.py \
+            --reference data/phase9i/reference/reference_5m.csv \
+            --fresh "$FRESH_OUTPUT" \
+            --frontier artifacts/frontier/regime_discovery_train_pareto.csv \
+            --source-commit "$SOURCE_COMMIT" \
+            --source-sha256 "$SOURCE_SHA256" \
+            --output-dir artifacts/phase9i
+
+      - name: Upload Phase 9I artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpr-phase9i-emergency-${{ github.run_id }}
+          path: artifacts/phase9i/*
+
+      - name: Persist state and run log
+        if: success()
+        run: |
+          set -euo pipefail
+          mkdir -p docs/phase9i/data
+          cp artifacts/phase9i/phase9i_provenance.csv docs/phase9i/data/latest_provenance.csv
+          cp artifacts/phase9i/phase9i_completed_event_trades.csv docs/phase9i/data/latest_completed_event_trades.csv
+          cp artifacts/phase9i/phase9i_pending_signals.csv docs/phase9i/data/latest_pending_signals.csv
+          cp artifacts/phase9i/phase9i_event_summary.csv docs/phase9i/data/latest_event_summary.csv
+          cp artifacts/phase9i/phase9i_portfolio_trades.csv docs/phase9i/data/latest_portfolio_trades.csv
+          cp artifacts/phase9i/phase9i_portfolio_summary.csv docs/phase9i/data/latest_portfolio_summary.csv
+          cp artifacts/phase9i/phase9i_run_state.json docs/phase9i/data/latest_run_state.json
+          cp artifacts/phase9i/status.md docs/phase9i/latest_status.md 2>/dev/null || true
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          state = json.loads(Path("artifacts/phase9i/phase9i_run_state.json").read_text())
+          with Path("docs/phase9i/run_log.md").open("a", encoding="utf-8") as f:
+              f.write(f"\n## Emergency run $GITHUB_RUN_ID — $SOURCE_COMMIT\n\n- Status: **{state.get('status')}**\n- Completed event trades: {state.get('completed_event_trades',0)}\n- Completed non-overlap portfolio trades: {state.get('completed_portfolio_trades',0)}\n- Fresh data end: {state.get('fresh_data_end','unknown')}\n")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/phase9i
+          git diff --cached --quiet || (git commit -m "Phase 9I: persist emergency validation state" && git push)
+
+      - name: Log failure
+        if: failure()
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          with Path("docs/CPR_ERROR_LOG.md").open("a", encoding="utf-8") as f:
+              f.write(f"\n## Emergency Phase 9I workflow failure — run $GITHUB_RUN_ID\n\n- Classification: **implementation/execution failure until inspected; not a scientific result**\n- Branch: cpr-v1.0-phase9i-prospective-validation\n- Scientific hypothesis changed: **NO**.\n- Candidate refitting/reselection: **NO**.\n")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/CPR_ERROR_LOG.md
+          git diff --cached --quiet || (git commit -m "Phase 9I: log emergency workflow failure" && git push)
