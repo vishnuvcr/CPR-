@@ -40,3 +40,13 @@ If a future chat stops unexpectedly, resume from this checkpoint and the ledger.
 - Public dashboard URL: **https://vishnuvcr.github.io/CPR-/**
 - Scientific candidate, cutoff, maturity rule and no-refit/no-reselection constraints remain unchanged.
 - If the first deployment reports that the repository Pages site itself is not enabled, the repository owner must select **Settings → Pages → Source: GitHub Actions** once; the workflow is already prepared for that deployment mode.
+
+
+## GitHub Pages deployment correction — 2026-09-20
+
+- Initial project Pages access returned 404 even though repository Pages source was set to GitHub Actions.
+- Corrected by placing the Pages publishing workflow on the default `main` branch, where it checks out the active Phase 9I branch and publishes the persisted dashboard state.
+- Trigger model: successful Phase 9I completion (`workflow_run`), manual dispatch, main-workflow changes, and weekday fallback schedule.
+- The branch-local duplicate Pages workflow was removed.
+- Public project URL remains: **https://vishnuvcr.github.io/CPR-/**
+- No scientific research rule changed.
