@@ -672,3 +672,14 @@ Workflow run: 35457500756. Preparation, frozen frontier verification, Phase 7 an
 - Corrected commit: `553f52e41b837290ae73ad309705edecbae1e977`; this is an implementation repair only.
 - No scientific result was generated and 2026 remained unused for selection.
 - Next action: trigger the fallback runner again using the corrected current branch revision, then inspect all artifacts before any conclusion.
+
+
+## 24. Phase 9H completion — 2026-09-19
+
+- Workflow 35459389390 succeeded; artifact 10589707833 generated with digest `sha256:fcb6264d34f385309adce2e08d51ffaf198b0d957993457044ba376a1e162108`.
+- Phase 9H produced 576 strategy/cost/context cells across Phase 7 independent and untouched 2026 data.
+- No deployable trading strategy is established.
+- Most useful frozen research candidate: LEAF_4 / SHORT / 10-session swing / ATR 1R stop + 2R target. Under ₹10/order + 5 bps/side, Phase 7 n=222 mean net R +0.173, bootstrap CI [-0.066,+0.398]; untouched 2026 n=28 mean net R +0.843, CI [+0.351,+1.321].
+- Because the independent Phase 7 interval includes zero, the candidate is not promoted to paper/live trading.
+- Phase 9H exit criterion is satisfied: the project has a usable research conclusion and a concrete candidate for prospective validation.
+- Continuity checkpoint: `docs/CPR_CONTINUITY_CHECKPOINT.md`.
