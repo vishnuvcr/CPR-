@@ -1,0 +1,93 @@
+name: CPR Phase 9H Economic Strategy Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [cpr-v1.0-phase9h-economic-strategy-validation]
+    paths:
+      - ".github/workflows/cpr-phase9h-economic-strategy-validation.yml"
+      - "scripts/run_phase9h_economic_strategy_validation.py"
+      - "scripts/run_phase9g_frontier_consensus_validation.py"
+      - "scripts/run_cpr_regime_discovery.py"
+      - "scripts/prepare_phase7_independent_nifty.py"
+      - "scripts/prepare_phase8_final_nifty.py"
+      - "scripts/prepare_reference_nifty.py"
+      - "cpr_lab/**"
+
+jobs:
+  economic-strategy-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          python -m pip install "scikit-learn>=1.5" pyarrow scipy statsmodels
+
+      - name: Restore cached Phase 9H data
+        uses: actions/cache@v4
+        with:
+          path: data/phase9h
+          key: cpr-phase9h-data-v1-${{ runner.os }}-reference-81800ba10cf47e9c7806b6a40e300ef389187846-p7-c26c9babf4d7becc628f9fe23d71cd2e9e3c0db9-p8-e8f19f3f53ca6fac0b116e83508e814e568dca54
+
+      - name: Prepare frozen reference and frontier
+        run: |
+          mkdir -p data/phase9h
+          if [ ! -f data/phase9h/reference_5m.csv ]; then
+            curl -L --fail --retry 3 "https://raw.githubusercontent.com/sandeepkapri/Nifty50-Minute-Data/81800ba10cf47e9c7806b6a40e300ef389187846/nifty50_candlestick_data.csv" -o data/phase9h/reference.csv
+            python scripts/prepare_reference_nifty.py --input data/phase9h/reference.csv --output data/phase9h/reference_5m.csv
+          fi
+          rm -rf artifacts/frontier
+          python scripts/run_cpr_regime_discovery.py --input data/phase9h/reference_5m.csv --output-dir artifacts/frontier
+          test "$(sha256sum artifacts/frontier/regime_discovery_train_pareto.csv | cut -d' ' -f1)" = "601a72f5e64204aee7ff0bb77347d57b0e2b59871b8bc30011282c2dc02c28b2"
+
+      - name: Prepare Phase 7 independent data
+        run: |
+          mkdir -p data/phase9h
+          if [ ! -f data/phase9h/p7_5m.csv ]; then
+            test "$(curl -sS --fail https://api.github.com/repos/ganeshbiyer/Nse_Historical_Data/git/trees/2a5ef9b3032a26a968b5595a452a77270188058e?recursive=1 | python -c 'import json,sys; print(next(x["sha"] for x in json.load(sys.stdin)["tree"] if x["path"]=="NIFTY50-INDEX.parquet"))')" = "c26c9babf4d7becc628f9fe23d71cd2e9e3c0db9"
+            curl -L --fail --retry 3 "https://raw.githubusercontent.com/ganeshbiyer/Nse_Historical_Data/af4d583e9bc0b5d7567b33bd5ec575cee5cbae3/NIFTY50-INDEX.parquet" -o data/phase9h/p7.parquet
+            python scripts/prepare_phase7_independent_nifty.py --input data/phase9h/p7.parquet --output data/phase9h/p7_5m.csv
+          fi
+
+      - name: Prepare Phase 8 untouched data
+        run: |
+          mkdir -p data/phase9h
+          if [ ! -f data/phase9h/p8_5m.csv ]; then
+            curl -L --fail --retry 3 "https://raw.githubusercontent.com/ganeshbiyer/Nse_Historical_Data_2026/e8f19f3f53ca6fac0b116e83508e814e568dca54/NIFTY50-INDEX.parquet" -o data/phase9h/p8.parquet
+            python scripts/prepare_phase8_final_nifty.py --input data/phase9h/p8.parquet --output data/phase9h/p8_5m.csv
+          fi
+
+      - name: Run Phase 9H
+        run: |
+          python scripts/run_phase9h_economic_strategy_validation.py \
+            --reference data/phase9h/reference_5m.csv \
+            --p7 data/phase9h/p7_5m.csv \
+            --p8 data/phase9h/p8_5m.csv \
+            --frontier artifacts/frontier/regime_discovery_train_pareto.csv \
+            --output-dir artifacts/phase9h
+
+      - name: Publish summary
+        run: |
+          {
+            echo "## Phase 9H — Economic / Strategy-Conditional Validation"
+            cat artifacts/phase9h/phase9h_provenance.csv
+            echo
+            echo "### Strategy summary"
+            cat artifacts/phase9h/phase9h_strategy_summary.csv
+            echo
+            echo "### Strategy cells"
+            cat artifacts/phase9h/phase9h_strategy_cells.csv
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload research artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpr-phase9h-economic-strategy-validation
+          path: artifacts/phase9h/*.csv
