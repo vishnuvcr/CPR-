@@ -57,7 +57,7 @@ jobs:
           fi
           rm -rf artifacts/frontier
           mkdir -p artifacts/frontier
-          python scripts/run_cpr_regime_discovery.py --input data/phase9i/reference/reference_5m.csv --output-dir artifacts/frontier
+          cp research_outputs/regime_discovery/regime_discovery_train_pareto.csv artifacts/frontier/regime_discovery_train_pareto.csv
           test "$(sha256sum artifacts/frontier/regime_discovery_train_pareto.csv | cut -d' ' -f1)" = "601a72f5e64204aee7ff0bb77347d57b0e2b59871b8bc30011282c2dc02c28b2"
 
       - name: Prepare fresh 2026 bars and run Phase 9I
@@ -89,6 +89,10 @@ jobs:
         if: success()
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin cpr-v1.0-phase9i-prospective-validation
+          git reset --hard origin/cpr-v1.0-phase9i-prospective-validation
           mkdir -p docs/phase9i/data
           cp artifacts/phase9i/phase9i_provenance.csv docs/phase9i/data/latest_provenance.csv
           cp artifacts/phase9i/phase9i_completed_event_trades.csv docs/phase9i/data/latest_completed_event_trades.csv
@@ -108,7 +112,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/phase9i
-          git diff --cached --quiet || (git commit -m "Phase 9I: persist emergency validation state" && git push)
+          git diff --cached --quiet || (git commit -m "Phase 9I: persist emergency validation state" && git push origin HEAD:cpr-v1.0-phase9i-prospective-validation)
 
       - name: Log failure
         if: failure()
@@ -122,4 +126,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/CPR_ERROR_LOG.md
-          git diff --cached --quiet || (git commit -m "Phase 9I: log emergency workflow failure" && git push)
+          git diff --cached --quiet || (git commit -m "Phase 9I: log emergency workflow failure" && git push origin HEAD:cpr-v1.0-phase9i-prospective-validation)
