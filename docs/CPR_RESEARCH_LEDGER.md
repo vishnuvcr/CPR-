@@ -734,3 +734,16 @@ Workflow run: 35457500756. Preparation, frozen frontier verification, Phase 7 an
 - 2026 re-selection/refitting: **NO**.
 - Interpretation: the prospective gate is correctly active but has not yet accumulated any new post-cutoff observations. No strategy verdict can be inferred from this readiness state.
 - Next automatic step: scheduled/manual Phase 9I reruns will resolve the latest immutable 2026 source commit, use the cached source by SHA, and update the persistent state when new observations become available.
+
+
+## 27. GitHub Pages publication setup — 2026-09-20
+
+- Phase 9I prospective-validation dashboard infrastructure was added without changing the scientific plan, frozen candidate, cutoff, maturity rule, or no-refit/no-reselection constraints.
+- Pages workflow: `.github/workflows/cpr-phase9i-pages.yml`.
+- Dashboard source: `site/index.html`.
+- Persisted data source: `docs/phase9i/data/`.
+- Dashboard URL: **https://vishnuvcr.github.io/CPR-/**
+- Publication is triggered by Phase 9I state changes on the active branch and supports manual workflow dispatch.
+- The dashboard is a presentation layer; the repository protocol and stored machine-readable outputs remain authoritative for scientific interpretation.
+- Setup/provenance is documented in `docs/CPR_GITHUB_PAGES_SETUP.md`.
+- No scientific hypothesis or research-phase decision changed as a result of this infrastructure step.
