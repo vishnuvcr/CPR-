@@ -663,3 +663,12 @@ Workflow run: 35457500756. Preparation, frozen frontier verification, Phase 7 an
 - Corrective commit now on branch: `6f1c403dda9046e3787de0fc599bba4d3d53b56c`.
 - The cost routine now explicitly normalizes both trade date and statutory cutoff to timezone-naive timestamps before comparison and asserts that invariant.
 - Next step: wait for/inspect the push-triggered Phase 9H run on the corrected commit; do not interpret any results until artifacts are generated and inspected.
+
+
+## 23. Phase 9H fallback execution checkpoint — 2026-09-19
+
+- Fallback workflow run: **35459099070 — failed** before scientific evaluation.
+- Cause: a prior patch accidentally inserted literal `\\n` escape text into the Python source, causing a SyntaxError.
+- Corrected commit: `553f52e41b837290ae73ad309705edecbae1e977`; this is an implementation repair only.
+- No scientific result was generated and 2026 remained unused for selection.
+- Next action: trigger the fallback runner again using the corrected current branch revision, then inspect all artifacts before any conclusion.
