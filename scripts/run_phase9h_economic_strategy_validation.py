@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 
 from cpr_lab.data_quality import load_ohlcv_csv
+from cpr_lab.indicators import add_intraday_daily_features, daily_reference_features
 from run_phase9g_frontier_consensus_validation import make_events, frozen_trees, assign_frontier_regime
 
 FRONTIER_SHA256 = "601a72f5e64204aee7ff0bb77347d57b0e2b59871b8bc30011282c2dc02c28b2"
@@ -207,6 +208,10 @@ def simulate_event(bars, row, signal_idx, strategy, scenario, session_pos, sessi
 
 def prepare_dataset(name, path, reference_bars, frontier):
     bars = load_ohlcv_csv(path)
+    daily = bars.resample("1D").agg({"open":"first","high":"max","low":"min","close":"last","volume":"sum"}).dropna()
+    featured = add_intraday_daily_features(bars, daily_reference_features(daily))
+    if "D_ATR20" not in featured.columns:
+        raise ValueError(f"{name}: featured bars missing D_ATR20")
     events = make_events(bars)
     trees = frozen_trees(reference_bars)
     parts = []
@@ -219,7 +224,7 @@ def prepare_dataset(name, path, reference_bars, frontier):
         parts.append(z)
     if not parts:
         raise ValueError(f"{name}: no events in named frozen frontier leaves")
-    return bars, pd.concat(parts, ignore_index=True)
+    return bars, featured, pd.concat(parts, ignore_index=True)
 
 def main():
     ap = argparse.ArgumentParser()
@@ -246,7 +251,7 @@ def main():
         datasets[name] = prepare_dataset(name, path, reference, frontier)
 
     rows = []
-    for dataset, (bars, events) in datasets.items():
+    for dataset, (bars, featured_bars, events) in datasets.items():
         session_days = sorted(pd.Index(bars.index.normalize()).unique())
         session_end = {d: int(np.flatnonzero(bars.index.normalize() == d)[-1]) for d in session_days}
         session_pos = {d: i for i, d in enumerate(session_days)}
@@ -259,7 +264,7 @@ def main():
             for strategy in STRATEGIES:
                 for scenario in SCENARIOS:
                     result = simulate_event(
-                        bars, row, sig, strategy, scenario, session_pos, session_end
+                        featured_bars, row, sig, strategy, scenario, session_pos, session_end
                     )
                     if result:
                         result["dataset"] = dataset
