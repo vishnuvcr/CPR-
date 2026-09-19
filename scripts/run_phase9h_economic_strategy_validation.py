@@ -63,7 +63,7 @@ def cost_roundtrip(entry_value, exit_value, scenario, trade_day):
     turnover = abs(entry_value) + abs(exit_value)
     exchange = turnover * FUTURES_EXCHANGE_RATE
     sebi = turnover * SEBI_RATE
-    stt_rate = FUTURES_STT_PRE_2026 if pd.Timestamp(trade_day) < pd.Timestamp("2026-04-01") else FUTURES_STT_POST_2026
+    trade_ts = pd.Timestamp(trade_day)\n    if trade_ts.tzinfo is not None:\n        trade_ts = trade_ts.tz_localize(None)\n    stt_rate = FUTURES_STT_PRE_2026 if trade_ts < pd.Timestamp("2026-04-01") else FUTURES_STT_POST_2026
     stt = abs(exit_value) * stt_rate
     stamp = abs(entry_value) * FUTURES_STAMP_RATE
     brokerage = 2.0 * cfg["brokerage"]
