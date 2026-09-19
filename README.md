@@ -83,4 +83,4 @@ The 30–40% monthly objective is a scenario to quantify, not a presumed propert
 
 ## Latest research status
 
-**Phase 9H complete.** Economic/strategy validation found no deployable trading strategy yet. A frozen research candidate for prospective validation is **LEAF_4 / SHORT / 10-session swing / ATR 1R stop + 2R target**. Its Phase-7 independent bootstrap interval still includes zero, so it is not promoted to paper/live trading. See `docs/CPR_PHASE9H_RESULT.md` and `docs/CPR_CONTINUITY_CHECKPOINT.md`.
+**Phase 9I initiated.** The frozen Phase 9H research candidate **LEAF_4 / SHORT / 10-session swing / ATR 1R stop + 2R target** is now under a genuinely new chronological/prospective holdout beginning after 17-Sep-2026 15:30 Asia/Kolkata. The candidate, regime frontier and execution rules are frozen; no refitting or 2026 re-selection is permitted. Early runs may legitimately report `INSUFFICIENT_NEW_HOLDOUT` while awaiting enough new market data. See `docs/CPR_PHASE9I_PROTOCOL.md`, `docs/CPR_PHASE9I_STATUS.md` and `docs/CPR_CONTINUITY_CHECKPOINT.md`.
