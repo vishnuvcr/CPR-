@@ -747,3 +747,12 @@ Workflow run: 35457500756. Preparation, frozen frontier verification, Phase 7 an
 - The dashboard is a presentation layer; the repository protocol and stored machine-readable outputs remain authoritative for scientific interpretation.
 - Setup/provenance is documented in `docs/CPR_GITHUB_PAGES_SETUP.md`.
 - No scientific hypothesis or research-phase decision changed as a result of this infrastructure step.
+
+
+## 28. GitHub Pages deployment correction — 2026-09-20
+
+- Initial project Pages URL returned 404 while repository Pages was configured for GitHub Actions.
+- The publishing architecture was corrected by moving the Pages workflow to the default `main` branch and having it check out the active `cpr-v1.0-phase9i-prospective-validation` branch for dashboard data/content.
+- The default-branch workflow triggers after successful Phase 9I completion via `workflow_run`, supports manual dispatch, and includes a weekday fallback schedule.
+- Duplicate branch-local Pages workflow removed.
+- Scientific plan/candidate/cutoff/maturity rule/no-refit policy: **unchanged**.
