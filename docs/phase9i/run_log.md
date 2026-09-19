@@ -18,3 +18,13 @@ This is the persistent, factual execution log for the prospective validation pha
 - Corrected in commit `a24991d5c7934fdcc7bf3baad08628a66868c241`.
 - No data, candidate, cutoff, cost or statistical rule changed.
 - First scientific workflow run remains pending.
+
+##  — workflow run 35468434477
+
+- Git SHA: 6246445f9db2a1bf5d11f17894669cfea8f4435f
+- Source commit: e8f19f3f53ca6fac0b116e83508e814e568dca54
+- Source SHA256: 8861e062df4d1aa861120c2b1613f8b50e0de7d99fd89625066077e224a5aa5f
+- Status: **INSUFFICIENT_NEW_HOLDOUT**
+- Completed event trades: 0
+- Completed non-overlap portfolio trades: 0
+- Pending signals: 0
