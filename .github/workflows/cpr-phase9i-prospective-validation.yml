@@ -261,7 +261,7 @@ jobs:
               row = next(csv.DictReader(src), {})
           log = Path("docs/phase9i/run_log.md")
           with log.open("a", encoding="utf-8") as f:
-              f.write("\n## ${{ github.run_started_at }} — workflow run ${{ github.run_id }}\n\n")
+              f.write("\n## Phase 9I workflow run ${{ github.run_id }}\n\n")
               f.write(f"- Git SHA: ${{ github.sha }}\n")
               f.write(f"- Source commit: {row.get('source_commit','unknown')}\n")
               f.write(f"- Source SHA256: {row.get('source_sha256','unknown')}\n")
@@ -293,7 +293,7 @@ jobs:
           from pathlib import Path
           log = Path("docs/CPR_ERROR_LOG.md")
           with log.open("a", encoding="utf-8") as f:
-              f.write("\n## ${{ github.run_started_at }} — Phase 9I workflow failure\n\n")
+              f.write("\n## Phase 9I workflow failure — run ${{ github.run_id }}\n\n")
               f.write("- Classification: **implementation/execution failure until inspected; not a scientific result**\n")
               f.write("- Workflow run: ${{ github.run_id }}\n")
               f.write("- Git SHA: ${{ github.sha }}\n")
