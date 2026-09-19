@@ -1,6 +1,9 @@
 name: CPR Phase 9I GitHub Pages Dashboard
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
   workflow_run:
     workflows:
