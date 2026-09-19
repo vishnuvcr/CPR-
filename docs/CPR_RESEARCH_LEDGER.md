@@ -38,7 +38,7 @@
 
 **Current phase:** **9H — Economic / Strategy-Conditional Validation**
 
-**Current status:** IN PROGRESS — Phase 9H Run #2 failed due a timezone-handling implementation bug in cost calculation; corrected code is committed as `5f2e7e8f3155db973193e0f73a7429a2f6cf51a6`, and the failed run is classified as implementation-only. A rerun is required before any scientific interpretation.
+**Current status:** IN PROGRESS — Phase 9H Run #2 failed due a timezone-handling implementation bug in cost calculation. A manual rerun reused the original failing revision and therefore repeated the same implementation error. The corrected branch now contains hardened timezone handling at commit `6f1c403dda9046e3787de0fc599bba4d3d53b56c`; the next push-triggered workflow run must be used for scientific evaluation.
 
 Latest active branch:
 `cpr-v1.0-phase9h-economic-strategy-validation`
@@ -655,3 +655,11 @@ Workflow run: 35457500756. Preparation, frozen frontier verification, Phase 7 an
 - Fix commit: `5f2e7e8f3155db973193e0f73a7429a2f6cf51a6`.
 - Required next action: rerun Phase 9H, then inspect every artifact before recording scientific results or opening the next phase.
 - User continuity instruction recorded: continue routine debugging automatically, do not stop midway unless serious intervention is required; before each next research step, read this ledger and the error log.
+
+
+## 22. Phase 9H corrective execution checkpoint — 2026-09-19
+
+- Run #2 (35458024849) was manually rerun, but the rerun reused the original failing revision and repeated the timezone error. This is an execution/reproducibility issue, not a scientific result.
+- Corrective commit now on branch: `6f1c403dda9046e3787de0fc599bba4d3d53b56c`.
+- The cost routine now explicitly normalizes both trade date and statutory cutoff to timezone-naive timestamps before comparison and asserts that invariant.
+- Next step: wait for/inspect the push-triggered Phase 9H run on the corrected commit; do not interpret any results until artifacts are generated and inspected.
