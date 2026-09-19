@@ -75,3 +75,7 @@ Do not run a single full-sample optimization and call it validation. The intende
 ## Important boundary
 
 The 30–40% monthly objective is a scenario to quantify, not a presumed property of CPR. The repository is designed to falsify the hypothesis when the edge disappears after costs, bias controls, or out-of-sample testing.
+
+## Continuity / read-first rule
+
+**Before any new research step, read `docs/CPR_RESEARCH_LEDGER.md` first.** It is the canonical cross-chat project state and records phase status, workflow IDs, artifacts, errors/fixes, methodological decisions, and the current next-step gate. Do not reconstruct the research state from memory when the ledger is available.
