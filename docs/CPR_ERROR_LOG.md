@@ -116,3 +116,13 @@
 - Holdout policy changed: **NO**.
 - 2026 selection/refitting: **NO**.
 - Status: **CLOSED** after successful Run #2.
+
+
+## GitHub Pages deployment issue — 2026-09-20
+
+- Observed: project Pages URL initially returned **404 / There isn't a GitHub Pages site here** despite repository Pages being configured to **GitHub Actions**.
+- Diagnosis: the first Pages workflow existed only on the Phase 9I branch. For reliable Pages orchestration, the publishing workflow was moved to the default `main` branch and made to check out the active Phase 9I branch for published state.
+- Corrected architecture: default-branch workflow listens for successful completion of **CPR Phase 9I Prospective Chronological Validation** via `workflow_run`, supports manual dispatch, and has a weekday fallback schedule.
+- The duplicate branch-local Pages workflow was removed to avoid competing deployments.
+- Scientific hypothesis/candidate/data-selection policy changed: **NO**.
+- This is an infrastructure/deployment correction, not a scientific result.
