@@ -86,3 +86,17 @@
 - Important readiness rule: a run with insufficient post-cutoff data is recorded as `INSUFFICIENT_NEW_HOLDOUT`, not as a negative trading result.
 - Candidate/refit policy changed: **NO**.
 - 2026 re-selection: **NO**.
+
+
+## 2026-09-20 — Phase 9I pre-run API correction
+
+- Classification: **implementation error detected during pre-run validation; not a scientific result**
+- Failure: Phase 9I script initially called `frozen_trees(reference, frontier)`, but the verified Phase 9G helper signature is `frozen_trees(reference_bars)`.
+- Cause: the new Phase 9I wrapper incorrectly assumed the helper accepted the frontier as a second positional argument.
+- Correction: changed the call to `frozen_trees(reference)` and retained the separate frozen-frontier hash/count assertion before regime assignment.
+- Corrective commit: `a24991d5c7934fdcc7bf3baad08628a66868c241`.
+- Scientific hypothesis changed: **NO**.
+- Candidate parameters changed: **NO**.
+- Holdout policy changed: **NO**.
+- 2026 selection/refitting: **NO**.
+- Status: **CLOSED before first scientific Phase 9I run**.
