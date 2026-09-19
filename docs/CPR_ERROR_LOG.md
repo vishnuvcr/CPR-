@@ -15,3 +15,12 @@
 - Data/holdout policy changed: **NO**
 - 2026 used for selection: **NO**
 - Follow-up: patch the script, add an invariant/unit-level check, rerun Phase 9G, then inspect artifacts before advancing.
+
+## 2026-09-19 — Phase 9G Run #4 success
+
+- Run ID: 35456904514
+- Final commit: aee98cf17f8f5d141cdd8d5f6f014505fc890944
+- All workflow stages passed.
+- The prior NumPy `.isin()` implementation error was corrected with `np.isin` and row-aligned regime labels.
+- Scientific outputs were generated and artifact integrity/provenance checks passed.
+- Result: no replicated incremental consensus information inside named frozen frontier leaves.
