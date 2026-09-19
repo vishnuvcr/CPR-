@@ -57,3 +57,14 @@
 - Correction: hardened the timezone-normalization implementation and created a new commit `6f1c403dda9046e3787de0fc599bba4d3d53b56c`; the push trigger on the phase branch will execute the corrected revision.
 - Scientific hypothesis changed: **NO**.
 - 2026 selection: **NO**.
+
+## 2026-09-19 — Phase 9H fallback Run 1 failure
+
+- Workflow run ID: 35459099070
+- Classification: **implementation error; not a scientific result**
+- Failure: `SyntaxError: unexpected character after line continuation character`
+- Cause: the corrective timezone block was accidentally written with literal `\\n` escape text into the Python source instead of real line breaks.
+- Correction: replaced the malformed block with valid Python statements; corrected commit `553f52e41b837290ae73ad309705edecbae1e977`.
+- Scientific hypothesis changed: **NO**.
+- 2026 selection: **NO**.
+- Follow-up: rerun the fallback workflow against the corrected current Phase 9H branch and inspect artifacts.
