@@ -11,13 +11,13 @@ https://vishnuvcr.github.io/CPR-/
 ## Publication design
 
 - Source branch: `cpr-v1.0-phase9i-prospective-validation`
-- Pages workflow: `.github/workflows/cpr-phase9i-pages.yml`
+- Pages workflow: `.github/workflows/cpr-phase9i-pages.yml` on the default `main` branch.
 - Dashboard source: `site/index.html`
 - Published research data: `docs/phase9i/data/`
 - Latest human-readable status: `docs/phase9i/latest_status.md`
 - Run history: `docs/phase9i/run_log.md`
 
-The Pages workflow rebuilds the site whenever Phase 9I repository state changes and also exposes a manual workflow-dispatch path. It copies the current machine-readable validation outputs and key protocol/continuity documents into the Pages artifact.
+The default-branch Pages workflow is triggered after successful Phase 9I workflow completion (`workflow_run`), on changes to the Pages workflow itself, on a weekday schedule, and manually. It checks out the active Phase 9I branch and publishes the persisted state. It copies the current machine-readable validation outputs and key protocol/continuity documents into the Pages artifact.
 
 ## Scientific boundary
 
