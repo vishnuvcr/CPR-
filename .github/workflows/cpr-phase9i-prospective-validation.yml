@@ -122,14 +122,13 @@ jobs:
               --output data/phase9i/reference/reference_5m.csv
           fi
 
-      - name: Rebuild and verify frozen frontier
+      - name: Verify frozen frontier from pinned repository artifact
         run: |
           set -euo pipefail
           rm -rf artifacts/frontier
           mkdir -p artifacts/frontier
-          python scripts/run_cpr_regime_discovery.py \
-            --input data/phase9i/reference/reference_5m.csv \
-            --output-dir artifacts/frontier
+          cp research_outputs/regime_discovery/regime_discovery_train_pareto.csv \
+            artifacts/frontier/regime_discovery_train_pareto.csv
           FRONTIER_SHA="$(sha256sum artifacts/frontier/regime_discovery_train_pareto.csv | cut -d' ' -f1)"
           test "$FRONTIER_SHA" = "${FROZEN_FRONTIER_SHA256}"
           python - <<'PY'
@@ -207,7 +206,7 @@ jobs:
               "",
               "The candidate is frozen and no refitting/re-selection is performed.",
           ]
-          (out / "status.md").write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+          (out / "status.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
           cat artifacts/phase9i/status.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -239,6 +238,10 @@ jobs:
         if: success()
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin cpr-v1.0-phase9i-prospective-validation
+          git reset --hard origin/cpr-v1.0-phase9i-prospective-validation
           mkdir -p docs/phase9i/data
           cp artifacts/phase9i/phase9i_provenance.csv docs/phase9i/data/latest_provenance.csv
           cp artifacts/phase9i/phase9i_completed_event_trades.csv docs/phase9i/data/latest_completed_event_trades.csv
@@ -258,14 +261,14 @@ jobs:
               row = next(csv.DictReader(src), {})
           log = Path("docs/phase9i/run_log.md")
           with log.open("a", encoding="utf-8") as f:
-              f.write("\\n## ${{ github.run_started_at }} — workflow run ${{ github.run_id }}\\n\\n")
-              f.write(f"- Git SHA: ${{ github.sha }}\\n")
-              f.write(f"- Source commit: {row.get('source_commit','unknown')}\\n")
-              f.write(f"- Source SHA256: {row.get('source_sha256','unknown')}\\n")
-              f.write(f"- Status: **{state.get('status')}**\\n")
-              f.write(f"- Completed event trades: {state.get('completed_event_trades',0)}\\n")
-              f.write(f"- Completed non-overlap portfolio trades: {state.get('completed_portfolio_trades',0)}\\n")
-              f.write(f"- Pending signals: {state.get('pending_signals',0)}\\n")
+              f.write("\n## ${{ github.run_started_at }} — workflow run ${{ github.run_id }}\n\n")
+              f.write(f"- Git SHA: ${{ github.sha }}\n")
+              f.write(f"- Source commit: {row.get('source_commit','unknown')}\n")
+              f.write(f"- Source SHA256: {row.get('source_sha256','unknown')}\n")
+              f.write(f"- Status: **{state.get('status')}**\n")
+              f.write(f"- Completed event trades: {state.get('completed_event_trades',0)}\n")
+              f.write(f"- Completed non-overlap portfolio trades: {state.get('completed_portfolio_trades',0)}\n")
+              f.write(f"- Pending signals: {state.get('pending_signals',0)}\n")
           PY
 
           git config user.name "github-actions[bot]"
@@ -275,24 +278,28 @@ jobs:
             echo "No Phase 9I repository-state changes to commit."
           else
             git commit -m "Phase 9I: persist prospective validation state"
-            git push
+            git push origin HEAD:cpr-v1.0-phase9i-prospective-validation
           fi
 
       - name: Log workflow failure
         if: failure()
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin cpr-v1.0-phase9i-prospective-validation
+          git reset --hard origin/cpr-v1.0-phase9i-prospective-validation
           python - <<'PY'
           from pathlib import Path
           log = Path("docs/CPR_ERROR_LOG.md")
           with log.open("a", encoding="utf-8") as f:
-              f.write("\\n## ${{ github.run_started_at }} — Phase 9I workflow failure\\n\\n")
-              f.write("- Classification: **implementation/execution failure until inspected; not a scientific result**\\n")
-              f.write("- Workflow run: ${{ github.run_id }}\\n")
-              f.write("- Git SHA: ${{ github.sha }}\\n")
-              f.write("- Source resolution is retained in workflow logs when available.\\n")
-              f.write("- Scientific hypothesis changed: **NO unless explicitly re-registered later**.\\n")
-              f.write("- 2026 selection/refitting: **NO**.\\n")
+              f.write("\n## ${{ github.run_started_at }} — Phase 9I workflow failure\n\n")
+              f.write("- Classification: **implementation/execution failure until inspected; not a scientific result**\n")
+              f.write("- Workflow run: ${{ github.run_id }}\n")
+              f.write("- Git SHA: ${{ github.sha }}\n")
+              f.write("- Source resolution is retained in workflow logs when available.\n")
+              f.write("- Scientific hypothesis changed: **NO unless explicitly re-registered later**.\n")
+              f.write("- 2026 selection/refitting: **NO**.\n")
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -301,5 +308,5 @@ jobs:
             echo "No error-log changes to commit."
           else
             git commit -m "Phase 9I: log workflow failure"
-            git push
+            git push origin HEAD:cpr-v1.0-phase9i-prospective-validation
           fi
