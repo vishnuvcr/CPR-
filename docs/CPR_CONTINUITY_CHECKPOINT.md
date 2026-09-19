@@ -29,3 +29,14 @@
 ## Recovery rule
 
 If a future chat stops unexpectedly, resume from this checkpoint and the ledger. Never claim a deployable strategy exists until the fresh Phase 9I gate has matured and its pre-registered criteria have been reviewed. Routine implementation errors must be logged and corrected without changing the scientific hypothesis.
+
+
+## GitHub Pages publication — 2026-09-20
+
+- Phase 9I dashboard infrastructure: **SET UP**.
+- Pages workflow: `.github/workflows/cpr-phase9i-pages.yml`.
+- Dashboard source: `site/index.html`.
+- Persisted Phase 9I data under `docs/phase9i/data/` is copied into the Pages artifact.
+- Public dashboard URL: **https://vishnuvcr.github.io/CPR-/**
+- Scientific candidate, cutoff, maturity rule and no-refit/no-reselection constraints remain unchanged.
+- If the first deployment reports that the repository Pages site itself is not enabled, the repository owner must select **Settings → Pages → Source: GitHub Actions** once; the workflow is already prepared for that deployment mode.
